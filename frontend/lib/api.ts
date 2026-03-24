@@ -1,3 +1,9 @@
+/**
+ * Minimal frontend API client for Milestone 1 authentication flows.
+ *
+ * Later milestones can expand this into a shared fetch wrapper with typed
+ * domain clients, but the current version intentionally stays small.
+ */
 export type UserPayload = {
   id: number;
   username: string;
@@ -52,6 +58,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 
 export function login(username: string, password: string): Promise<LoginResponse> {
+  /** Exchange username and password credentials for a bearer token. */
   return request<LoginResponse>("/auth/login", {
     method: "POST",
     body: JSON.stringify({ username, password }),
@@ -60,6 +67,7 @@ export function login(username: string, password: string): Promise<LoginResponse
 
 
 export function getCurrentUser(token: string): Promise<CurrentUserResponse> {
+  /** Resolve the current user profile from an existing bearer token. */
   return request<CurrentUserResponse>("/auth/me", {
     headers: {
       Authorization: `Bearer ${token}`,

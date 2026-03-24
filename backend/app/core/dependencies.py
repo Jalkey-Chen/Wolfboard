@@ -1,3 +1,5 @@
+"""Reusable FastAPI dependencies for authentication and authorization."""
+
 from collections.abc import Callable
 
 from fastapi import Depends, HTTPException, status
@@ -19,7 +21,13 @@ def get_current_user(
     db: Session = Depends(get_db),
     token: str = Depends(oauth2_scheme),
 ) -> User:
-    """Resolve the authenticated user from a bearer token."""
+    """Resolve the authenticated user from a bearer token.
+
+    The dependency performs three checks:
+    1. the token must be a valid JWT issued by this service,
+    2. the subject must map to an existing user,
+    3. the user must still be in an active account state.
+    """
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -40,7 +48,12 @@ def get_current_user(
 
 
 def require_role(role_key: str) -> Callable[[User], User]:
-    """Require the authenticated user to hold a specific system role."""
+    """Require the authenticated user to hold a specific system role.
+
+    This is intentionally role-only for Milestone 1. Resource ownership checks
+    such as "judge must own the game" can be composed on top of it in later
+    milestones without changing the authentication contract.
+    """
 
     def dependency(current_user: User = Depends(get_current_user)) -> User:
         if role_key not in current_user.roles:

@@ -1,3 +1,5 @@
+"""Role model representing system-level permissions."""
+
 from sqlalchemy import String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -5,7 +7,12 @@ from app.db.base_class import Base
 
 
 class Role(Base):
-    """System permission role assigned through the user-role mapping table."""
+    """System permission role assigned through the user-role mapping table.
+
+    Roles describe what a user is allowed to do globally in the system. They do
+    not describe game-specific context such as whether a user is the judge of a
+    particular game.
+    """
 
     __tablename__ = "roles"
 

@@ -1,3 +1,5 @@
+"""Top-level API router registration for versioned endpoints."""
+
 from fastapi import APIRouter
 
 from app.api.routes import auth

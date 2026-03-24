@@ -1,3 +1,5 @@
+"""FastAPI application entrypoint for the Wolfboard backend."""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -24,13 +26,13 @@ app.include_router(api_router, prefix=settings.api_v1_prefix)
 
 @app.get("/", tags=["health"])
 def read_root() -> dict[str, str]:
-    """Return a small health payload for local development."""
+    """Return a minimal root payload for quick manual checks."""
 
     return {"message": "Wolfboard backend is running."}
 
 
 @app.get("/healthz", tags=["health"])
 def healthcheck() -> dict[str, str]:
-    """Expose a simple liveness endpoint."""
+    """Expose a simple liveness endpoint used by local tooling."""
 
     return {"status": "ok"}

@@ -1,3 +1,5 @@
+"""Seed default roles and local development users."""
+
 from sqlalchemy import select
 
 from app.core.security import get_password_hash
@@ -50,7 +52,11 @@ DEFAULT_PASSWORD = "password123"
 
 
 def seed_roles() -> dict[str, Role]:
-    """Create the default system roles if they do not already exist."""
+    """Create the default system roles if they do not already exist.
+
+    The seed script is idempotent so container startup can safely re-run it on
+    every boot without creating duplicate rows.
+    """
 
     with SessionLocal() as db:
         existing_roles = {
@@ -73,7 +79,11 @@ def seed_roles() -> dict[str, Role]:
 
 
 def seed_users(roles_by_key: dict[str, Role]) -> None:
-    """Create sample users and attach the requested role mappings."""
+    """Create sample users and attach the requested role mappings.
+
+    Users are created first, then linked through the normalized `user_roles`
+    table so the seed data matches the intended production schema.
+    """
 
     with SessionLocal() as db:
         existing_users = {
@@ -104,6 +114,7 @@ def seed_users(roles_by_key: dict[str, Role]) -> None:
             for role_key in user_payload["roles"]:
                 role = roles_by_key[role_key]
                 if role.id not in existing_role_ids:
+                    # Only create missing mappings so repeated seeds remain safe.
                     db.add(UserRole(user_id=user.id, role_id=role.id))
 
         db.commit()

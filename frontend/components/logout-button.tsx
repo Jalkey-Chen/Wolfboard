@@ -1,5 +1,6 @@
 "use client";
 
+/** Sign-out control that clears the locally stored access token. */
 import { useRouter } from "next/navigation";
 
 import { clearStoredAccessToken } from "@/lib/auth";

@@ -1,3 +1,5 @@
+"""User model for authenticated platform accounts."""
+
 from datetime import datetime
 
 from sqlalchemy import DateTime, String, func
@@ -7,7 +9,12 @@ from app.db.base_class import Base
 
 
 class User(Base):
-    """Application user with zero or more system permission roles."""
+    """Application user with zero or more system permission roles.
+
+    The model intentionally avoids a single `role_id` field. Multi-role support
+    is required because one real person may participate as a player in some
+    contexts while also acting as a judge or admin elsewhere.
+    """
 
     __tablename__ = "users"
 
@@ -38,6 +45,10 @@ class User(Base):
 
     @property
     def roles(self) -> list[str]:
-        """Return stable role keys for authorization checks and API responses."""
+        """Return stable role keys for authorization checks and API responses.
+
+        This computed helper keeps the API payload simple while preserving the
+        normalized `user_roles` table structure in the database layer.
+        """
 
         return sorted(user_role.role.role_key for user_role in self.user_roles if user_role.role is not None)

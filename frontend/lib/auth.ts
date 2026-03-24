@@ -1,3 +1,4 @@
+/** Browser-side access token helpers used by the Milestone 1 frontend. */
 const ACCESS_TOKEN_STORAGE_KEY = "wolfboard_access_token";
 
 

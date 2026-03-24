@@ -1,3 +1,5 @@
+"""Alembic environment configuration."""
+
 from logging.config import fileConfig
 
 from alembic import context
@@ -18,7 +20,12 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    """Run migrations in offline mode."""
+    """Run migrations in offline mode.
+
+    Offline mode emits SQL without creating a live database connection. It is
+    useful for tooling and debugging, even though local development typically
+    uses online migrations.
+    """
 
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
@@ -34,7 +41,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in online mode."""
+    """Run migrations in online mode against the configured PostgreSQL database."""
 
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),

@@ -1,3 +1,5 @@
+"""Authentication-related database access helpers."""
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -13,7 +15,11 @@ ROLE_LOAD_OPTIONS = (
 
 
 def get_user_by_username(db: Session, username: str) -> User | None:
-    """Fetch a user and eagerly load assigned roles for authentication."""
+    """Fetch a user and eagerly load assigned roles for authentication.
+
+    Eager loading avoids additional lazy queries when the endpoint needs to
+    serialize the user's role list immediately after authentication.
+    """
 
     statement = (
         select(User)
@@ -31,7 +37,12 @@ def get_user_by_id(db: Session, user_id: int) -> User | None:
 
 
 def authenticate_user(db: Session, username: str, password: str) -> User | None:
-    """Authenticate an active user with a username and password."""
+    """Authenticate an active user with a username and password.
+
+    A user must exist, be active, and provide a valid password hash match. The
+    function returns `None` instead of raising so API handlers can shape the
+    final HTTP response consistently.
+    """
 
     user = get_user_by_username(db, username)
     if user is None:

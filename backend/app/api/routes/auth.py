@@ -1,3 +1,5 @@
+"""Authentication endpoints for login and current-user resolution."""
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -15,7 +17,12 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/login", response_model=AuthResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)) -> AuthResponse:
-    """Authenticate a user and return a JWT plus the resolved role list."""
+    """Authenticate a user and return a JWT plus the resolved role list.
+
+    The response intentionally returns a list of system roles rather than a
+    single role field because the platform supports multi-role users such as an
+    admin who can also judge or play in tournaments.
+    """
 
     user = authenticate_user(db, payload.username, payload.password)
     if user is None:
@@ -37,7 +44,11 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> AuthResponse:
 
 @router.get("/me", response_model=MeResponse)
 def read_current_user(current_user: User = Depends(get_current_user)) -> MeResponse:
-    """Return the authenticated user profile and role keys."""
+    """Return the authenticated user profile and role keys.
+
+    This endpoint is the frontend's source of truth after login. It allows the
+    UI to render all navigation branches implied by the current role set.
+    """
 
     return MeResponse(
         user=UserRead.model_validate(current_user),

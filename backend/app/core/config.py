@@ -1,3 +1,5 @@
+"""Centralized application settings loaded from environment variables."""
+
 from functools import lru_cache
 from typing import Annotated
 
@@ -6,7 +8,12 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
+    """Application settings loaded from environment variables.
+
+    A dedicated settings object keeps deployment-specific concerns out of the
+    rest of the codebase and provides a single place to evolve configuration as
+    more services are introduced in later milestones.
+    """
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -35,7 +42,12 @@ class Settings(BaseSettings):
     @field_validator("backend_cors_origins", mode="before")
     @classmethod
     def split_cors_origins(cls, value: str | list[str]) -> list[str]:
-        """Allow CORS origins to be passed as a comma-separated string."""
+        """Allow CORS origins to be passed as a comma-separated string.
+
+        Docker Compose and many deployment platforms expose list-like settings
+        as strings, so this parser keeps the environment contract simple while
+        still exposing a strongly typed list inside the application.
+        """
 
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
@@ -44,7 +56,7 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    """Memoize settings so imports stay cheap."""
+    """Memoize settings so repeated imports do not rebuild the settings object."""
 
     return Settings()
 

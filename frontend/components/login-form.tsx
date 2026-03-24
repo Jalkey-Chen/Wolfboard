@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Login form for Milestone 1.
+ *
+ * The browser stores the JWT in localStorage for simplicity. This is adequate
+ * for the scaffold phase and can later be replaced with a more hardened cookie
+ * strategy without changing the backend auth contract.
+ */
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 

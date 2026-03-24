@@ -1,3 +1,5 @@
+"""Association model linking users to system roles."""
+
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, UniqueConstraint, func
@@ -7,7 +9,11 @@ from app.db.base_class import Base
 
 
 class UserRole(Base):
-    """Mapping table that assigns system roles to users."""
+    """Mapping table that assigns system roles to users.
+
+    The uniqueness constraint prevents duplicate role assignments for the same
+    user and keeps authorization checks deterministic.
+    """
 
     __tablename__ = "user_roles"
     __table_args__ = (UniqueConstraint("user_id", "role_id", name="uq_user_roles_user_id_role_id"),)

@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * Client-side dashboard shell that resolves the authenticated user and renders
+ * placeholder sections based on the complete role set returned by the backend.
+ */
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -48,6 +52,8 @@ export function DashboardShell() {
         setStatus("ready");
       })
       .catch(() => {
+        // Invalid tokens are discarded immediately so the browser does not keep
+        // retrying protected requests with a stale credential.
         clearStoredAccessToken();
         setErrorMessage("Your session is invalid or expired. Please sign in again.");
         setStatus("error");
@@ -59,6 +65,7 @@ export function DashboardShell() {
     if (!profile) {
       return [];
     }
+    // A stable role order prevents the UI from shifting based on assignment order.
     return [...profile.roles].sort((left, right) => roleOrder.indexOf(left) - roleOrder.indexOf(right));
   }, [profile]);
 
