@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
+import { useI18n } from "@/components/language-provider";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { getFormat, updateFormat, type GameFormatDetail } from "@/lib/api";
@@ -16,6 +17,7 @@ import { useAuthenticatedSession } from "@/lib/use-authenticated-session";
 export default function FormatDetailPage() {
   const params = useParams<{ id: string }>();
   const formatId = Number(params.id);
+  const { t, enumLabel } = useI18n();
   const { token, profile, isLoading, hasRole } = useAuthenticatedSession();
   const [gameFormat, setGameFormat] = useState<GameFormatDetail | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -29,12 +31,12 @@ export default function FormatDetailPage() {
     void getFormat(token, formatId)
       .then((response) => setGameFormat(response))
       .catch((error) => {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to load the format.");
+        setErrorMessage(error instanceof Error ? error.message : t("formats.detail.loadError"));
       });
-  }, [formatId, profile, token]);
+  }, [formatId, profile, t, token]);
 
   if (isLoading) {
-    return <PageLoading message="Loading format details..." />;
+    return <PageLoading message={t("formats.detail.loading")} />;
   }
 
   if (!profile || Number.isNaN(formatId)) {
@@ -54,7 +56,7 @@ export default function FormatDetailPage() {
       });
       setGameFormat(updated);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to update the format.");
+      setErrorMessage(error instanceof Error ? error.message : t("common.failedToLoad"));
     } finally {
       setIsToggling(false);
     }
@@ -63,8 +65,8 @@ export default function FormatDetailPage() {
   return (
     <SiteShell
       profile={profile}
-      title={gameFormat?.format_name ?? "Format"}
-      description={gameFormat?.description ?? "Preset format detail and role composition."}
+      title={gameFormat?.format_name ?? t("formats.title")}
+      description={gameFormat?.description ?? t("formats.description")}
       actions={
         hasRole("admin") && gameFormat ? (
           <button
@@ -74,10 +76,10 @@ export default function FormatDetailPage() {
             type="button"
           >
             {isToggling
-              ? "Saving..."
+              ? t("resultEntry.saving")
               : gameFormat.is_active
-                ? "Disable Format"
-                : "Enable Format"}
+                ? t("formats.inactive")
+                : t("formats.active")}
           </button>
         ) : null
       }
@@ -90,44 +92,44 @@ export default function FormatDetailPage() {
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
               <div className="grid gap-4 md:grid-cols-4">
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Players</div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("formats.playerCount")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{gameFormat.player_count}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Category</div>
-                  <div className="mt-2 text-sm font-semibold text-slate-700">{gameFormat.category}</div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.category")}</div>
+                  <div className="mt-2 text-sm font-semibold text-slate-700">{enumLabel("formatCategory", gameFormat.category)}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Preset</div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.preset")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">
-                    {gameFormat.is_system_preset ? "System preset" : "Custom"}
+                    {gameFormat.is_system_preset ? t("common.yes") : t("common.no")}
                   </div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Status</div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.status")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">
-                    {gameFormat.is_active ? "active" : "inactive"}
+                    {gameFormat.is_active ? t("formats.active") : t("formats.inactive")}
                   </div>
                 </div>
               </div>
             </section>
 
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
-              <h2 className="text-2xl font-bold text-ink">Role Composition</h2>
+              <h2 className="text-2xl font-bold text-ink">{t("formats.roles")}</h2>
               <div className="mt-5 overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200 text-sm">
                   <thead>
                     <tr className="text-left text-slate-500">
-                      <th className="px-3 py-3 font-semibold">Role</th>
-                      <th className="px-3 py-3 font-semibold">Faction</th>
-                      <th className="px-3 py-3 font-semibold">Count</th>
+                      <th className="px-3 py-3 font-semibold">{t("common.role")}</th>
+                      <th className="px-3 py-3 font-semibold">{t("common.faction")}</th>
+                      <th className="px-3 py-3 font-semibold">{t("common.count")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {gameFormat.roles.map((role) => (
                       <tr key={role.id}>
                         <td className="px-3 py-4 font-semibold text-ink">{role.role_name}</td>
-                        <td className="px-3 py-4 text-slate-700">{role.faction}</td>
+                        <td className="px-3 py-4 text-slate-700">{enumLabel("formatRoleFaction", role.faction)}</td>
                         <td className="px-3 py-4 text-slate-700">{role.role_count}</td>
                       </tr>
                     ))}

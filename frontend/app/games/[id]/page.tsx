@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
+import { useI18n } from "@/components/language-provider";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { formatDate, formatDateTime } from "@/lib/date";
@@ -21,6 +22,7 @@ import { useAuthenticatedSession } from "@/lib/use-authenticated-session";
 export default function GameDetailPage() {
   const params = useParams<{ id: string }>();
   const gameId = Number(params.id);
+  const { t, enumLabel } = useI18n();
   const { token, profile, isLoading } = useAuthenticatedSession();
   const [game, setGame] = useState<GameDetail | null>(null);
   const [resultDraft, setResultDraft] = useState<GameResultDraftResponse | null>(null);
@@ -37,9 +39,9 @@ export default function GameDetailPage() {
     void getGame(token, gameId)
       .then((response) => setGame(response))
       .catch((error) => {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to load the game.");
+        setErrorMessage(error instanceof Error ? error.message : t("games.loadError"));
       });
-  }, [gameId, profile, token]);
+  }, [gameId, profile, t, token]);
 
   useEffect(() => {
     if (!token || !profile || !game) {
@@ -64,7 +66,7 @@ export default function GameDetailPage() {
   }, [game, profile, token, userIsAdmin, userIsJudge]);
 
   if (isLoading) {
-    return <PageLoading message="Loading game details..." />;
+    return <PageLoading message={t("games.loading")} />;
   }
 
   if (!profile || Number.isNaN(gameId)) {
@@ -83,8 +85,8 @@ export default function GameDetailPage() {
   return (
     <SiteShell
       profile={profile}
-      title={game ? `Table ${game.table_number} · Game ${game.game_number}` : "Game"}
-      description={game ? `${game.season_name} · ${game.event_day_title}` : "Game setup detail."}
+      title={game ? `${game.table_number}桌 · 第${game.game_number}局` : t("games.title")}
+      description={game ? `${game.season_name} · ${game.event_day_title}` : t("games.description")}
       actions={
         game ? (
           <div className="flex flex-wrap gap-3">
@@ -93,7 +95,7 @@ export default function GameDetailPage() {
                 className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
                 href={`/judge/games/${game.id}/result`}
               >
-                {canEditResult ? "Enter Result" : "View Result"}
+                {canEditResult ? t("games.enterResult") : t("games.viewResult")}
               </Link>
             ) : null}
             {canReviewResult ? (
@@ -101,7 +103,7 @@ export default function GameDetailPage() {
                 className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
                 href={`/admin/games/${game.id}/review`}
               >
-                Review Result
+                {t("games.reviewResult")}
               </Link>
             ) : null}
             {userIsAdmin ? (
@@ -109,7 +111,7 @@ export default function GameDetailPage() {
                 className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
                 href={`/admin/event-days/${game.event_day_id}/games`}
               >
-                Manage Games
+                {t("games.manageGames")}
               </Link>
             ) : null}
           </div>
@@ -124,96 +126,96 @@ export default function GameDetailPage() {
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Season</div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.season")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{game.season_name}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Event Day</div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.eventDay")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{game.event_day_title}</div>
                   <div className="mt-1 text-xs text-slate-500">{formatDate(game.event_day_date)}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Format</div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.format")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{game.format.format_name}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Judge</div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.judge")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{game.judge.display_name}</div>
                 </div>
               </div>
 
               <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Table</div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.table")}</div>
                   <div className="mt-2 text-sm text-slate-700">{game.table_number}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Game Number</div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.gameNumber")}</div>
                   <div className="mt-2 text-sm text-slate-700">{game.game_number}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Game Type</div>
-                  <div className="mt-2 text-sm text-slate-700">{game.game_type}</div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.gameType")}</div>
+                  <div className="mt-2 text-sm text-slate-700">{enumLabel("gameType", game.game_type)}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Status</div>
-                  <div className="mt-2 text-sm text-slate-700">{game.status}</div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.status")}</div>
+                  <div className="mt-2 text-sm text-slate-700">{enumLabel("gameStatus", game.status)}</div>
                 </div>
               </div>
             </section>
 
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
-              <h2 className="text-2xl font-bold text-ink">Timing and Notes</h2>
+              <h2 className="text-2xl font-bold text-ink">{t("games.timingAndNotes")}</h2>
               <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Venue</div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.venue")}</div>
                   <div className="mt-2 text-sm text-slate-700">{game.event_day_venue}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Started At</div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("games.startedAt")}</div>
                   <div className="mt-2 text-sm text-slate-700">{formatDateTime(game.started_at)}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Ended At</div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("games.endedAt")}</div>
                   <div className="mt-2 text-sm text-slate-700">{formatDateTime(game.ended_at)}</div>
                 </div>
               </div>
               <div className="mt-5 rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-700">
-                {game.notes ?? "No notes provided yet."}
+                {game.notes ?? t("common.noNotes")}
               </div>
 
               <div className="mt-5 rounded-2xl border border-dashed border-slate-300 px-4 py-4 text-sm text-slate-600">
                 {canEditResult
-                  ? "This game is editable by the assigned judge. Use the result entry page to save a draft or submit the result."
+                  ? t("games.editableHint")
                   : game.status === "submitted"
-                    ? "This game has been submitted and is now read-only for the judge."
-                    : "No result entry actions are available for your current role on this game."}
+                    ? t("games.submittedHint")
+                    : t("games.noActionHint")}
               </div>
             </section>
 
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
-              <h2 className="text-2xl font-bold text-ink">Result Summary</h2>
+              <h2 className="text-2xl font-bold text-ink">{t("games.resultSummary")}</h2>
               {resultDraft && resultDraft.players.length > 0 ? (
                 <div className="mt-5 overflow-x-auto">
                   <table className="min-w-full divide-y divide-slate-200 text-sm">
                     <thead>
                       <tr className="text-left text-slate-500">
-                        <th className="px-3 py-3 font-semibold">Seat</th>
-                        <th className="px-3 py-3 font-semibold">Player</th>
-                        <th className="px-3 py-3 font-semibold">Role</th>
-                        <th className="px-3 py-3 font-semibold">Faction</th>
-                        <th className="px-3 py-3 font-semibold">Winner</th>
-                        <th className="px-3 py-3 font-semibold">Final</th>
+                        <th className="px-3 py-3 font-semibold">{t("common.seat")}</th>
+                        <th className="px-3 py-3 font-semibold">{t("common.player")}</th>
+                        <th className="px-3 py-3 font-semibold">{t("common.role")}</th>
+                        <th className="px-3 py-3 font-semibold">{t("common.faction")}</th>
+                        <th className="px-3 py-3 font-semibold">{t("common.winner")}</th>
+                        <th className="px-3 py-3 font-semibold">{t("resultEntry.final")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {resultDraft.players.map((player) => (
                         <tr key={player.id}>
-                          <td className="px-3 py-4 text-slate-700">{player.seat_number ?? "Not set"}</td>
-                          <td className="px-3 py-4 text-slate-700">{player.display_name || "Not selected"}</td>
-                          <td className="px-3 py-4 text-slate-700">{player.role_name ?? "Not set"}</td>
-                          <td className="px-3 py-4 text-slate-700">{player.faction ?? "Not set"}</td>
-                          <td className="px-3 py-4 text-slate-700">{player.is_winner === null ? "Not set" : player.is_winner ? "Win" : "Lose"}</td>
+                          <td className="px-3 py-4 text-slate-700">{player.seat_number ?? t("common.notSet")}</td>
+                          <td className="px-3 py-4 text-slate-700">{player.display_name || t("resultEntry.notSelected")}</td>
+                          <td className="px-3 py-4 text-slate-700">{player.role_name ?? t("common.notSet")}</td>
+                          <td className="px-3 py-4 text-slate-700">{player.faction ? enumLabel("gamePlayerFaction", player.faction) : t("common.notSet")}</td>
+                          <td className="px-3 py-4 text-slate-700">{player.is_winner === null ? t("common.notSet") : player.is_winner ? t("common.win") : t("common.lose")}</td>
                           <td className="px-3 py-4 font-semibold text-ink">{player.final_score}</td>
                         </tr>
                       ))}
@@ -221,7 +223,7 @@ export default function GameDetailPage() {
                   </table>
                 </div>
               ) : (
-                <p className="mt-4 text-sm text-slate-600">No result draft has been saved for this game yet.</p>
+                <p className="mt-4 text-sm text-slate-600">{t("games.noResultDraft")}</p>
               )}
             </section>
           </>

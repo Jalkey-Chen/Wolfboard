@@ -10,6 +10,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { useI18n } from "@/components/language-provider";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { getFormats, type GameFormatRecord } from "@/lib/api";
@@ -17,6 +18,7 @@ import { useAuthenticatedSession } from "@/lib/use-authenticated-session";
 
 
 export default function FormatsPage() {
+  const { t, enumLabel } = useI18n();
   const { token, profile, isLoading } = useAuthenticatedSession();
   const [formats, setFormats] = useState<GameFormatRecord[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -29,12 +31,12 @@ export default function FormatsPage() {
     void getFormats(token)
       .then((response) => setFormats(response))
       .catch((error) => {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to load formats.");
+        setErrorMessage(error instanceof Error ? error.message : t("formats.loadError"));
       });
-  }, [profile, token]);
+  }, [profile, t, token]);
 
   if (isLoading) {
-    return <PageLoading message="Loading preset formats..." />;
+    return <PageLoading message={t("formats.loading")} />;
   }
 
   if (!profile) {
@@ -44,8 +46,8 @@ export default function FormatsPage() {
   return (
     <SiteShell
       profile={profile}
-      title="Formats"
-      description="Browse the preset format catalog and inspect the role composition behind each format."
+      title={t("formats.title")}
+      description={t("formats.description")}
     >
       <div className="flex flex-col gap-5">
         {errorMessage ? <PageError message={errorMessage} /> : null}
@@ -61,7 +63,7 @@ export default function FormatsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h2 className="text-xl font-semibold text-ink">{gameFormat.format_name}</h2>
-                    <p className="mt-2 text-sm text-slate-600">{gameFormat.description ?? "No description yet."}</p>
+                    <p className="mt-2 text-sm text-slate-600">{gameFormat.description ?? t("formats.noDescription")}</p>
                   </div>
                   <span
                     className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${
@@ -70,18 +72,18 @@ export default function FormatsPage() {
                         : "bg-slate-200 text-slate-600"
                     }`}
                   >
-                    {gameFormat.is_active ? "active" : "inactive"}
+                    {gameFormat.is_active ? t("formats.active") : t("formats.inactive")}
                   </span>
                 </div>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-xl bg-white px-3 py-3 text-sm text-slate-700">
-                    <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Players</div>
+                    <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("formats.playerCount")}</div>
                     <div className="mt-2 font-semibold">{gameFormat.player_count}</div>
                   </div>
                   <div className="rounded-xl bg-white px-3 py-3 text-sm text-slate-700">
-                    <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Category</div>
-                    <div className="mt-2 font-semibold">{gameFormat.category}</div>
+                    <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.category")}</div>
+                    <div className="mt-2 font-semibold">{enumLabel("formatCategory", gameFormat.category)}</div>
                   </div>
                 </div>
               </Link>

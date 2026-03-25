@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { useI18n } from "@/components/language-provider";
 import { clearStoredAccessToken, getStoredAccessToken } from "@/lib/auth";
 import { getCurrentUser, type CurrentUserResponse, type RoleKey } from "@/lib/api";
 
@@ -21,6 +22,7 @@ type UseAuthenticatedSessionOptions = {
 
 export function useAuthenticatedSession(options: UseAuthenticatedSessionOptions = {}) {
   const router = useRouter();
+  const { t } = useI18n();
   const [token, setToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<CurrentUserResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,11 +57,11 @@ export function useAuthenticatedSession(options: UseAuthenticatedSessionOptions 
       })
       .catch(() => {
         clearStoredAccessToken();
-        setErrorMessage("Your session is invalid or expired. Please sign in again.");
+        setErrorMessage(t("auth.invalidSession"));
         setIsLoading(false);
         router.replace("/login");
       });
-  }, [options.requiredRole, requiredRolesKey, router]);
+  }, [options.requiredRole, requiredRolesKey, router, t]);
 
   return {
     token,
