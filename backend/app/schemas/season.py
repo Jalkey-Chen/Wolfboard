@@ -1,4 +1,8 @@
-"""Schemas for season list, detail, create, and update flows."""
+"""Schemas for season list, detail, create, and update flows.
+
+The season API intentionally exposes compact list payloads and richer detail
+payloads so the frontend can avoid over-fetching during navigation.
+"""
 
 from datetime import date, datetime
 
@@ -61,6 +65,10 @@ class SeasonRead(BaseModel):
 
 
 class SeasonDetail(SeasonRead):
-    """Detailed season response with child event days."""
+    """Detailed season response with child event days.
+
+    This payload powers the season detail page and the admin flow that creates
+    event days directly from that page.
+    """
 
     event_days: list[EventDaySummary]

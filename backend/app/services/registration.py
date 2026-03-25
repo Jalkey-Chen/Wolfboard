@@ -1,4 +1,8 @@
-"""Service helpers for player registration and admin check-in flows."""
+"""Service helpers for player registration and admin check-in flows.
+
+This module contains the core business rules for who may register, when
+registration is open, and how admins change attendance state after signup.
+"""
 
 from datetime import datetime
 
@@ -50,7 +54,11 @@ def list_registrations_for_event_day(
     current_user: User,
     include_all: bool,
 ) -> list[Registration]:
-    """List registrations for an event day with admin or self-only visibility."""
+    """List registrations for an event day with admin or self-only visibility.
+
+    Admins receive the full list needed for check-in management. Non-admin
+    callers are intentionally scoped down to their own row.
+    """
 
     statement = (
         select(Registration)
@@ -66,7 +74,11 @@ def list_registrations_for_event_day(
 
 
 def registration_window_is_open(event_day: EventDay) -> bool:
-    """Return whether the event day is currently accepting registrations."""
+    """Return whether the event day is currently accepting registrations.
+
+    Both the event-day status and the configured open/close timestamps must
+    allow registration before a player can create or cancel a signup.
+    """
 
     if event_day.status != EventDayStatus.OPEN_FOR_REGISTRATION:
         return False
@@ -85,7 +97,11 @@ def create_registration(
     payload: RegistrationCreate,
     current_user: User,
 ) -> Registration:
-    """Create a self-registration for the current authenticated user."""
+    """Create a self-registration for the current authenticated user.
+
+    The function enforces the MVP rule that players can only create one signup
+    record per event day and only while the registration window is open.
+    """
 
     if not registration_window_is_open(event_day):
         raise HTTPException(
@@ -112,7 +128,11 @@ def create_registration(
 
 
 def cancel_registration(db: Session, registration: Registration, current_user: User) -> Registration:
-    """Cancel a self-registration while the event day is still open."""
+    """Cancel a self-registration while the event day is still open.
+
+    Cancellation is intentionally conservative in Milestone 2: once the window
+    closes, only admins should be able to adjust the record.
+    """
 
     if registration.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only cancel your own registration.")
@@ -134,7 +154,11 @@ def admin_update_registration(
     registration: Registration,
     payload: RegistrationAdminUpdate,
 ) -> Registration:
-    """Apply an admin-managed update to registration or check-in state."""
+    """Apply an admin-managed update to registration or check-in state.
+
+    Admins can resolve attendance, promote substitutes, or mark absences
+    without creating new rows or bypassing the unique registration constraint.
+    """
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(registration, field, value)

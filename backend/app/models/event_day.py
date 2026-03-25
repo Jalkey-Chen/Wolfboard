@@ -10,7 +10,12 @@ from app.db.base_class import Base
 
 
 class EventDay(Base):
-    """Scheduled tournament day with registration state and metadata."""
+    """Scheduled tournament day with registration state and metadata.
+
+    The model captures only the event-day layer in Milestone 2. It deliberately
+    stops short of game scheduling so Milestone 3 can add game management
+    without reworking registration or season structure.
+    """
 
     __tablename__ = "event_days"
 
@@ -64,6 +69,10 @@ class EventDay(Base):
 
     @property
     def registration_count(self) -> int:
-        """Return the current number of registrations loaded for this event day."""
+        """Return the current number of registrations loaded for this event day.
+
+        The property avoids duplicating a denormalized counter column while the
+        MVP still works with relatively small registration lists.
+        """
 
         return len(self.registrations)

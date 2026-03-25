@@ -1,4 +1,8 @@
-"""Schemas for player registrations and admin check-in updates."""
+"""Schemas for player registrations and admin check-in updates.
+
+Separating self-service create payloads from admin update payloads keeps the
+authorization boundary explicit at the schema layer as well as in the routers.
+"""
 
 from datetime import datetime
 

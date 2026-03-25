@@ -1,4 +1,8 @@
-"""Shared enum values used across Milestone 2 models and schemas."""
+"""Shared enum values used across Milestone 2 models and schemas.
+
+Keeping workflow values centralized prevents drift between SQLAlchemy models,
+Pydantic schemas, service logic, and the frontend API contract.
+"""
 
 from enum import Enum
 

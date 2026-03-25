@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Event-day detail page with self-service registration controls.
+ *
+ * The page shows public event metadata to authenticated users and overlays the
+ * viewer's own registration state when present.
+ */
+
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -86,6 +93,8 @@ export default function EventDayDetailPage() {
     }
   }
 
+  // The page derives button state from the server-returned event-day status and
+  // the viewer's own registration row so the UI stays aligned with backend rules.
   const canRegister =
     eventDay?.status === "open_for_registration" &&
     eventDay.viewer_registration === null;

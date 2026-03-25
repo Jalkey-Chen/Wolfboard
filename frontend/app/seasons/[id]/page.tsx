@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Season detail page with embedded admin event-day creation flow.
+ *
+ * Keeping event-day creation on the season page reduces navigation overhead
+ * for admins while preserving a clear public read path for players.
+ */
+
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";

@@ -1,4 +1,8 @@
-"""Seed default roles and local development users."""
+"""Seed default roles, users, seasons, event days, and registrations.
+
+The seed remains idempotent so local Docker startup can safely re-run it every
+time the backend container starts.
+"""
 
 from datetime import date, datetime, timedelta
 
@@ -130,7 +134,12 @@ def seed_users(roles_by_key: dict[str, Role]) -> None:
 
 
 def seed_seasons_and_event_days() -> None:
-    """Create Milestone 2 sample season and event-day records."""
+    """Create Milestone 2 sample season and event-day records.
+
+    The seeded data intentionally includes one open event day and one closed
+    event day so both player registration and admin check-in flows can be
+    tested immediately after startup.
+    """
 
     with SessionLocal() as db:
         admin_user = db.scalar(select(User).where(User.username == "admin_user"))
@@ -211,7 +220,11 @@ def seed_seasons_and_event_days() -> None:
 
 
 def seed_registrations() -> None:
-    """Create sample registrations used to test signup and admin check-in flows."""
+    """Create sample registrations used to test signup and admin check-in flows.
+
+    The open event day intentionally leaves `player_user` unregistered so the
+    player validation path can exercise a real signup from the UI or API.
+    """
 
     with SessionLocal() as db:
         users_by_username = {

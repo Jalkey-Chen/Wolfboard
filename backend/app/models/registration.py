@@ -10,7 +10,12 @@ from app.db.base_class import Base
 
 
 class Registration(Base):
-    """A user's signup and check-in record for a specific event day."""
+    """A user's signup and check-in record for a specific event day.
+
+    The record is unique per `(event_day_id, user_id)` so later flows such as
+    seating, grouping, and attendance resolution always have a single source of
+    truth for a user's presence on a given event day.
+    """
 
     __tablename__ = "registrations"
     __table_args__ = (

@@ -37,6 +37,8 @@ export function useAuthenticatedSession(options: UseAuthenticatedSessionOptions 
     void getCurrentUser(storedToken)
       .then((response) => {
         if (options.requiredRole && !response.roles.includes(options.requiredRole)) {
+          // Client-side route protection improves UX, but server-side role checks
+          // remain the authoritative enforcement mechanism.
           router.replace("/");
           return;
         }

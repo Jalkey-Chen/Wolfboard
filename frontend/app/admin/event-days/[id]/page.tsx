@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Admin event-day management page.
+ *
+ * The page focuses on editing one event day and links onward to the dedicated
+ * registration management view instead of embedding a large nested grid here.
+ */
+
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";

@@ -10,7 +10,11 @@ from app.db.base_class import Base
 
 
 class Season(Base):
-    """Tournament season with status, date range, and event-day children."""
+    """Tournament season with status, date range, and event-day children.
+
+    A season is the top-level organizing unit for the MVP. Event days attach to
+    a season, and later milestones will hang games and standings underneath it.
+    """
 
     __tablename__ = "seasons"
 

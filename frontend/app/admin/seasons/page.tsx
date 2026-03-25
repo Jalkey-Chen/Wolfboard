@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Admin season management page.
+ *
+ * This page combines season listing and season editing in one place so admins
+ * can quickly move between existing seasons and the create form.
+ */
+
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 

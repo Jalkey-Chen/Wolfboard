@@ -1,4 +1,8 @@
-"""Service helpers for season queries and admin mutations."""
+"""Service helpers for season queries and admin mutations.
+
+The service layer keeps route handlers thin and gives later milestones a stable
+place to add audit logging, richer validation, or transactional workflows.
+"""
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -10,7 +14,11 @@ from app.schemas.season import SeasonCreate, SeasonUpdate
 
 
 def list_seasons(db: Session) -> list[Season]:
-    """Return all seasons ordered by start date descending."""
+    """Return all seasons ordered by start date descending.
+
+    The UI favors the most recent or active seasons first, so descending date
+    order provides a better default than raw primary-key order.
+    """
 
     statement = select(Season).order_by(Season.start_date.desc(), Season.id.desc())
     return list(db.scalars(statement).all())

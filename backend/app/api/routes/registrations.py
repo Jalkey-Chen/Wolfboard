@@ -1,4 +1,8 @@
-"""Registration mutation endpoints for self-cancel and admin check-in updates."""
+"""Registration mutation endpoints for self-cancel and admin check-in updates.
+
+The endpoints here mutate existing registration rows instead of creating new
+records, preserving a single audit-friendly registration record per user/event.
+"""
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session

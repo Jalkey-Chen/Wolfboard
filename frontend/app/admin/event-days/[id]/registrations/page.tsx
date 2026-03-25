@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Admin registration and check-in management page.
+ *
+ * Each row is edited in place and saved explicitly so admins can review several
+ * fields together before persisting a check-in or registration-status change.
+ */
+
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";

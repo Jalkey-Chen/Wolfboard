@@ -1,4 +1,8 @@
-"""Season list, detail, and admin CRUD endpoints."""
+"""Season list, detail, and admin CRUD endpoints.
+
+These routes expose read access to all authenticated users while reserving
+create and update operations for admins.
+"""
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -45,7 +49,11 @@ def read_season(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> SeasonDetail:
-    """Return a single season and its event days for authenticated users."""
+    """Return a single season and its event days for authenticated users.
+
+    The detail endpoint is the main entry point for navigating from a season to
+    its event-day pages and admin event-day creation controls.
+    """
 
     _ = current_user
     season = get_season_or_404(db, season_id)

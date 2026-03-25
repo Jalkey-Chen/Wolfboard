@@ -1,4 +1,8 @@
-"""Schemas for event-day read and write operations."""
+"""Schemas for event-day read and write operations.
+
+The detail schema includes viewer-specific registration context so the frontend
+can render self-service signup state without making an extra request.
+"""
 
 from datetime import date, datetime
 
@@ -78,7 +82,11 @@ class EventDaySummary(BaseModel):
 
 
 class EventDayDetail(EventDaySummary):
-    """Detailed event-day response with self-registration context."""
+    """Detailed event-day response with self-registration context.
+
+    `viewer_registration` is populated only for the authenticated caller and is
+    safe to expose to players because it contains only their own registration.
+    """
 
     notes: str | None
     season_name: str

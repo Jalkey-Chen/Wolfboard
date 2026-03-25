@@ -1,4 +1,9 @@
-"""Event-day detail, admin CRUD, and nested registration endpoints."""
+"""Event-day detail, admin CRUD, and nested registration endpoints.
+
+This router combines event-day reads with the nested registration create/list
+operations because the event-day page is the user-facing place where those
+actions naturally happen.
+"""
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -17,7 +22,11 @@ router = APIRouter(prefix="/event-days", tags=["event-days"])
 
 
 def build_event_day_detail(event_day: EventDay, current_user: User) -> EventDayDetail:
-    """Build a detail payload with viewer-specific registration context."""
+    """Build a detail payload with viewer-specific registration context.
+
+    Only the current caller's own registration is attached. Admins who need the
+    full roster must use the dedicated registrations endpoint.
+    """
 
     viewer_registration = None
     for registration in event_day.registrations:

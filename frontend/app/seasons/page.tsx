@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Authenticated season list page.
+ *
+ * All logged-in users can browse seasons here, while admins also get a direct
+ * entry point into the season management page.
+ */
+
 import Link from "next/link";
 import { useEffect, useState } from "react";
 

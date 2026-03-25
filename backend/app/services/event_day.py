@@ -1,4 +1,8 @@
-"""Service helpers for event-day queries and admin mutations."""
+"""Service helpers for event-day queries and admin mutations.
+
+Event-day services centralize read patterns and validation that are shared by
+public pages, player registration flows, and admin management screens.
+"""
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -29,7 +33,11 @@ def list_event_days_for_season(db: Session, season_id: int) -> list[EventDay]:
 
 
 def get_event_day_or_404(db: Session, event_day_id: int) -> EventDay:
-    """Return an event day with season and registrations loaded or raise 404."""
+    """Return an event day with season and registrations loaded or raise 404.
+
+    The eager-loading strategy avoids repeated lazy queries when the frontend
+    needs both event-day metadata and viewer-specific registration state.
+    """
 
     statement = (
         select(EventDay)

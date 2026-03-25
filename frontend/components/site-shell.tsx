@@ -1,6 +1,10 @@
 "use client";
 
-/** Shared layout shell for authenticated pages in Milestone 2. */
+/** Shared layout shell for authenticated pages in Milestone 2.
+ *
+ * The shell keeps navigation, role badges, and sign-out behavior consistent
+ * across player-facing and admin-facing surfaces.
+ */
 import Link from "next/link";
 import type { ReactNode } from "react";
 
