@@ -11,8 +11,10 @@ from app.core.dependencies import get_current_user, require_role
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.event_day import EventDaySummary
+from app.schemas.leaderboard import LeaderboardEntryRead
 from app.schemas.season import SeasonCreate, SeasonDetail, SeasonRead, SeasonUpdate
 from app.services.event_day import list_event_days_for_season
+from app.services.leaderboard import get_season_leaderboard
 from app.services.season import create_season, get_season_or_404, list_seasons, update_season
 
 
@@ -90,3 +92,16 @@ def read_season_event_days(
     _ = get_season_or_404(db, season_id)
     event_days = list_event_days_for_season(db, season_id)
     return [EventDaySummary.model_validate(event_day) for event_day in event_days]
+
+
+@router.get("/{season_id}/leaderboard", response_model=list[LeaderboardEntryRead])
+def read_season_leaderboard(
+    season_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[LeaderboardEntryRead]:
+    """Return the official leaderboard for one season."""
+
+    _ = current_user
+    _ = get_season_or_404(db, season_id)
+    return get_season_leaderboard(db, season_id)

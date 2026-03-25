@@ -50,6 +50,19 @@ class User(Base):
     confirmed_games = relationship("Game", foreign_keys="Game.confirmed_by", back_populates="confirmer")
     game_players = relationship("GamePlayer", back_populates="user")
     created_score_adjustments = relationship("ScoreAdjustment", back_populates="creator")
+    score_logs = relationship("ScoreLog", back_populates="user")
+    result_confirmations_submitted = relationship(
+        "ResultConfirmation",
+        foreign_keys="ResultConfirmation.submitted_by",
+        back_populates="submitter",
+    )
+    result_confirmations_confirmed = relationship(
+        "ResultConfirmation",
+        foreign_keys="ResultConfirmation.confirmed_by",
+        back_populates="confirmer",
+    )
+    audit_logs = relationship("AuditLog", back_populates="actor")
+    game_status_history_entries = relationship("GameStatusHistory", back_populates="actor")
 
     @property
     def roles(self) -> list[str]:

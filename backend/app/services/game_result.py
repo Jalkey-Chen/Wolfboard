@@ -55,6 +55,8 @@ def ensure_can_view_game_result(game: Game, current_user: User) -> None:
 
     if "admin" in current_user.roles:
         return
+    if game.status in {GameStatus.CONFIRMED, GameStatus.REVISED}:
+        return
     if current_user.id == game.judge_user_id and "judge" in current_user.roles:
         return
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this game result.")
@@ -193,20 +195,8 @@ def _collect_adjustment_notes(adjustments: list[ScoreAdjustment]) -> tuple[str |
     )
 
 
-def save_game_result_draft(db: Session, game: Game, payload: GameResultDraftWrite, current_user: User) -> Game:
-    """Replace the current draft rows for a game and mark it in progress."""
-
-    ensure_can_edit_game_result(game, current_user)
-    validation = validate_game_result_payload(game, payload, submit_mode=False)
-    if validation.errors:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={
-                "message": "Draft validation failed.",
-                "errors": [message.model_dump() for message in validation.errors],
-                "warnings": [message.model_dump() for message in validation.warnings],
-            },
-        )
+def replace_game_result_rows(db: Session, game: Game, payload: GameResultDraftWrite, current_user: User) -> None:
+    """Replace all persisted player rows and score adjustments for a game."""
 
     # The draft endpoint follows a full-replacement model so the frontend does
     # not need row-level patch semantics while judges are editing at the table.
@@ -262,6 +252,29 @@ def save_game_result_draft(db: Session, game: Game, payload: GameResultDraftWrit
         player.judge_bonus_note, player.penalty_note = _collect_adjustment_notes(adjustments_by_player_id[player.id])
         db.add(player)
 
+
+def _raise_validation_error(message: str, validation: ValidationSummary) -> None:
+    """Raise a normalized validation error payload for API callers."""
+
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail={
+            "message": message,
+            "errors": [item.model_dump() for item in validation.errors],
+            "warnings": [item.model_dump() for item in validation.warnings],
+        },
+    )
+
+
+def save_game_result_draft(db: Session, game: Game, payload: GameResultDraftWrite, current_user: User) -> Game:
+    """Replace the current draft rows for a game and mark it in progress."""
+
+    ensure_can_edit_game_result(game, current_user)
+    validation = validate_game_result_payload(game, payload, submit_mode=False)
+    if validation.errors:
+        _raise_validation_error("Draft validation failed.", validation)
+
+    replace_game_result_rows(db, game, payload, current_user)
     game.status = GameStatus.IN_PROGRESS
     db.add(game)
     db.commit()
@@ -275,14 +288,7 @@ def submit_game_result(db: Session, game: Game, current_user: User) -> Game:
     payload, validation = _build_validation(game)
     _ = payload
     if validation.errors:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={
-                "message": "Result submission validation failed.",
-                "errors": [message.model_dump() for message in validation.errors],
-                "warnings": [message.model_dump() for message in validation.warnings],
-            },
-        )
+        _raise_validation_error("Result submission validation failed.", validation)
 
     game.status = GameStatus.SUBMITTED
     game.submitted_at = datetime.now(timezone.utc)

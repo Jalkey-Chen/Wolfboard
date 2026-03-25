@@ -118,3 +118,28 @@ class ScoreAdjustmentType(str, Enum):
     CONDUCT_PENALTY = "conduct_penalty"
     JUDGE_BONUS = "judge_bonus"
     MANUAL_ADJUSTMENT = "manual_adjustment"
+
+
+class ScoreLogSourceType(str, Enum):
+    """Source categories for formal score ledger entries."""
+
+    GAME_RESULT = "game_result"
+    ADMIN_ADJUSTMENT = "admin_adjustment"
+    ROLLBACK = "rollback"
+
+
+class ScoreLogEffectiveStatus(str, Enum):
+    """Lifecycle state for score-log rows in the formal ledger."""
+
+    PENDING = "pending"
+    EFFECTIVE = "effective"
+    VOIDED = "voided"
+
+
+class ResultConfirmationStatus(str, Enum):
+    """Confirmation outcomes recorded for submitted game results."""
+
+    SUBMITTED = "submitted"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    REVISED = "revised"
