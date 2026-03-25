@@ -13,6 +13,7 @@ from app.db.session import get_db
 from app.models.event_day import EventDay
 from app.models.user import User
 from app.schemas.event_day import EventDayCreate, EventDayDetail, EventDaySummary, EventDayUpdate
+from app.schemas.game import GameSummary
 from app.schemas.registration import RegistrationCreate, RegistrationRead
 from app.services.event_day import create_event_day, get_event_day_or_404, update_event_day
 from app.services.registration import create_registration, list_registrations_for_event_day
@@ -39,6 +40,8 @@ def build_event_day_detail(event_day: EventDay, current_user: User) -> EventDayD
         notes=event_day.notes,
         season_name=event_day.season_name,
         registration_count=event_day.registration_count,
+        game_count=event_day.game_count,
+        games=[GameSummary.model_validate(game) for game in event_day.games],
         viewer_registration=viewer_registration,
     )
 

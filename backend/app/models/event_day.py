@@ -60,6 +60,12 @@ class EventDay(Base):
         cascade="all, delete-orphan",
         order_by="Registration.created_at.asc()",
     )
+    games = relationship(
+        "Game",
+        back_populates="event_day",
+        cascade="all, delete-orphan",
+        order_by="(Game.table_number.asc(), Game.game_number.asc())",
+    )
 
     @property
     def season_name(self) -> str:
@@ -76,3 +82,9 @@ class EventDay(Base):
         """
 
         return len(self.registrations)
+
+    @property
+    def game_count(self) -> int:
+        """Return the current number of games loaded for this event day."""
+
+        return len(self.games)

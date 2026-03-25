@@ -9,6 +9,7 @@ from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from app.core.enums import EventDayCategory, EventDayStatus
+from app.schemas.game import GameSummary
 from app.schemas.registration import RegistrationRead
 
 
@@ -91,4 +92,6 @@ class EventDayDetail(EventDaySummary):
     notes: str | None
     season_name: str
     registration_count: int
+    game_count: int
+    games: list[GameSummary] = []
     viewer_registration: RegistrationRead | None = None

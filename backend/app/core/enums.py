@@ -57,3 +57,39 @@ class RegistrationType(str, Enum):
     MAIN = "main"
     SUBSTITUTE = "substitute"
     GUEST = "guest"
+
+
+class FormatCategory(str, Enum):
+    """High-level category assigned to a preset game format."""
+
+    STANDARD = "standard"
+    SPECIAL = "special"
+    FUN = "fun"
+
+
+class FormatRoleFaction(str, Enum):
+    """Faction classification for roles inside a format definition."""
+
+    GOOD = "good"
+    WOLF = "wolf"
+    THIRD_PARTY = "third_party"
+    SPECIAL = "special"
+
+
+class GameType(str, Enum):
+    """Classification for how a game should be treated operationally."""
+
+    OFFICIAL = "official"
+    FUN = "fun"
+    PRACTICE = "practice"
+
+
+class GameStatus(str, Enum):
+    """Lifecycle states for a game record."""
+
+    DRAFT = "draft"
+    IN_PROGRESS = "in_progress"
+    SUBMITTED = "submitted"
+    CONFIRMED = "confirmed"
+    REVISED = "revised"
+    CANCELLED = "cancelled"
