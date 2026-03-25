@@ -42,6 +42,9 @@ class User(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+    created_seasons = relationship("Season", back_populates="creator")
+    created_event_days = relationship("EventDay", back_populates="creator")
+    registrations = relationship("Registration", back_populates="user")
 
     @property
     def roles(self) -> list[str]:

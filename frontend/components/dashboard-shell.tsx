@@ -1,147 +1,172 @@
 "use client";
 
 /**
- * Client-side dashboard shell that resolves the authenticated user and renders
- * placeholder sections based on the complete role set returned by the backend.
+ * Home dashboard for Milestone 2.
+ *
+ * The page surfaces the active season, a recent event day, and role-aware
+ * navigation into the newly added season, event-day, and admin flows.
  */
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 
-import { LogoutButton } from "@/components/logout-button";
-import { getCurrentUser, type CurrentUserResponse } from "@/lib/api";
-import { clearStoredAccessToken, getStoredAccessToken } from "@/lib/auth";
-
-
-const roleCards: Record<string, { title: string; description: string; links: string[] }> = {
-  admin: {
-    title: "Admin Dashboard (placeholder)",
-    description: "Management entry point for administration, approvals, and system operations.",
-    links: ["Backend Home", "Season Management", "Audit Logs"],
-  },
-  judge: {
-    title: "Judge Dashboard (placeholder)",
-    description: "Work queue entry point for the games owned by the current judge.",
-    links: ["My Assigned Games", "Result Entry", "Submission Status"],
-  },
-  player: {
-    title: "Player Dashboard (placeholder)",
-    description: "Public-facing area for sign-ups, standings, and confirmed match history.",
-    links: ["Current Season", "Leaderboard", "My Match History"],
-  },
-};
-
-const roleOrder = ["admin", "judge", "player"];
+import { PageError, PageLoading } from "@/components/page-state";
+import { SiteShell } from "@/components/site-shell";
+import { formatDate, formatDateTime } from "@/lib/date";
+import { getSeason, getSeasons, type SeasonDetail, type SeasonRecord } from "@/lib/api";
+import { useAuthenticatedSession } from "@/lib/use-authenticated-session";
 
 
 export function DashboardShell() {
-  const router = useRouter();
-  const [profile, setProfile] = useState<CurrentUserResponse | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const { token, profile, isLoading, errorMessage: sessionErrorMessage, hasRole } = useAuthenticatedSession();
+  const [seasons, setSeasons] = useState<SeasonRecord[]>([]);
+  const [activeSeason, setActiveSeason] = useState<SeasonRecord | null>(null);
+  const [activeSeasonDetail, setActiveSeasonDetail] = useState<SeasonDetail | null>(null);
+  const [dataErrorMessage, setDataErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = getStoredAccessToken();
-    if (!token) {
-      router.replace("/login");
+    if (!token || !profile) {
       return;
     }
 
-    void getCurrentUser(token)
+    void getSeasons(token)
       .then((response) => {
-        setProfile(response);
-        setStatus("ready");
+        setSeasons(response);
+        const nextActiveSeason = response.find((season) => season.status === "active") ?? response[0] ?? null;
+        setActiveSeason(nextActiveSeason);
       })
-      .catch(() => {
-        // Invalid tokens are discarded immediately so the browser does not keep
-        // retrying protected requests with a stale credential.
-        clearStoredAccessToken();
-        setErrorMessage("Your session is invalid or expired. Please sign in again.");
-        setStatus("error");
-        router.replace("/login");
+      .catch((error) => {
+        setDataErrorMessage(error instanceof Error ? error.message : "Failed to load seasons.");
       });
-  }, [router]);
+  }, [profile, token]);
 
-  const orderedRoles = useMemo(() => {
-    if (!profile) {
-      return [];
+  useEffect(() => {
+    if (!token || !activeSeason) {
+      setActiveSeasonDetail(null);
+      return;
     }
-    // A stable role order prevents the UI from shifting based on assignment order.
-    return [...profile.roles].sort((left, right) => roleOrder.indexOf(left) - roleOrder.indexOf(right));
-  }, [profile]);
 
-  if (status === "loading") {
-    return (
-      <main className="flex min-h-screen items-center justify-center px-6">
-        <div className="rounded-2xl border border-slate-200 bg-white/90 px-8 py-6 shadow-lg shadow-slate-200/60">
-          <p className="text-sm font-medium text-slate-600">Loading your dashboard...</p>
-        </div>
-      </main>
-    );
+    void getSeason(token, activeSeason.id)
+      .then((response) => {
+        setActiveSeasonDetail(response);
+      })
+      .catch((error) => {
+        setDataErrorMessage(error instanceof Error ? error.message : "Failed to load the active season.");
+      });
+  }, [activeSeason, token]);
+
+  if (isLoading) {
+    return <PageLoading message="Loading your dashboard..." />;
   }
 
   if (!profile) {
     return null;
   }
 
-  return (
-    <main className="min-h-screen px-6 py-10">
-      <div className="mx-auto flex max-w-6xl flex-col gap-8">
-        <header className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white/90 p-8 shadow-xl shadow-slate-200/50 md:flex-row md:items-end md:justify-between">
-          <div className="space-y-3">
-            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-accent">Wolfboard</p>
-            <div>
-              <h1 className="text-3xl font-bold text-ink">{profile.user.display_name}</h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-600">
-                Milestone 1 is active. Authentication is live and the navigation below is derived from your assigned role set.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {orderedRoles.map((role) => (
-                <span
-                  key={role}
-                  className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-gold"
-                >
-                  {role}
-                </span>
-              ))}
-            </div>
-          </div>
-          <LogoutButton />
-        </header>
+  const recentEventDay = activeSeasonDetail?.event_days[0] ?? null;
+  const showPlayerSummary = hasRole("player") || hasRole("judge");
+  const showAdminSummary = hasRole("admin");
 
-        {errorMessage ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {errorMessage}
-          </div>
+  return (
+    <SiteShell
+      profile={profile}
+      title="Home"
+      description="Milestone 2 adds season, event-day, registration, and admin check-in flows."
+    >
+      <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+        {sessionErrorMessage ? <PageError message={sessionErrorMessage} /> : null}
+        {dataErrorMessage ? (
+          <PageError message={dataErrorMessage} />
         ) : null}
 
-        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {orderedRoles.map((role) => {
-            const card = roleCards[role];
-            if (!card) {
-              return null;
-            }
+        <article className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Active Season</p>
+          {activeSeason ? (
+            <>
+              <h2 className="mt-3 text-2xl font-bold text-ink">{activeSeason.name}</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                {formatDate(activeSeason.start_date)} to {formatDate(activeSeason.end_date)}
+              </p>
+              <div className="mt-5">
+                <Link className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800" href={`/seasons/${activeSeason.id}`}>
+                  Open Season
+                </Link>
+              </div>
+            </>
+          ) : (
+            <p className="mt-3 text-sm text-slate-600">No season is available yet.</p>
+          )}
+        </article>
 
-            return (
-              <article
-                key={role}
-                className="rounded-3xl border border-slate-200 bg-white/85 p-6 shadow-lg shadow-slate-200/50"
+        <article className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Recent Event Day</p>
+          {recentEventDay ? (
+            <>
+              <h2 className="mt-3 text-2xl font-bold text-ink">{recentEventDay.title}</h2>
+              <p className="mt-2 text-sm text-slate-600">{formatDate(recentEventDay.event_date)} · {recentEventDay.venue}</p>
+              <p className="mt-2 text-sm text-slate-600">
+                Registration closes: {formatDateTime(recentEventDay.registration_close_at)}
+              </p>
+              <div className="mt-5">
+                <Link className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800" href={`/event-days/${recentEventDay.id}`}>
+                  View Event Day
+                </Link>
+              </div>
+            </>
+          ) : (
+            <p className="mt-3 text-sm text-slate-600">No event day is available yet.</p>
+          )}
+        </article>
+
+        {showPlayerSummary ? (
+          <article className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">My Registration Status</p>
+            <h2 className="mt-3 text-2xl font-bold text-ink">Season signup flow is live</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Open registration event days now expose signup directly from their detail page. Your personal registration state is shown there once you sign up.
+            </p>
+            <div className="mt-5">
+              <Link className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200" href="/seasons">
+                Browse Seasons
+              </Link>
+            </div>
+          </article>
+        ) : null}
+
+        {showAdminSummary ? (
+          <article className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Admin Entry</p>
+            <h2 className="mt-3 text-2xl font-bold text-ink">Season and event-day management</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Create seasons, open registration windows, and manage check-in from the admin surfaces introduced in Milestone 2.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800" href="/admin/seasons">
+                Open Admin
+              </Link>
+              <Link className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200" href="/seasons">
+                View Seasons
+              </Link>
+            </div>
+          </article>
+        ) : null}
+
+        <article className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50 lg:col-span-2 xl:col-span-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Current Seasons</p>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {seasons.map((season) => (
+              <Link
+                key={season.id}
+                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 transition hover:border-slate-300 hover:bg-white"
+                href={`/seasons/${season.id}`}
               >
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{role}</p>
-                <h2 className="mt-3 text-2xl font-bold text-ink">{card.title}</h2>
-                <p className="mt-3 text-sm leading-6 text-slate-600">{card.description}</p>
-                <ul className="mt-5 space-y-2 text-sm text-slate-700">
-                  {card.links.map((link) => (
-                    <li key={link} className="rounded-xl bg-slate-50 px-3 py-2">
-                      {link}
-                    </li>
-                  ))}
-                </ul>
-              </article>
-            );
-          })}
-        </section>
+                <div className="text-sm font-semibold text-ink">{season.name}</div>
+                <div className="mt-1 text-sm text-slate-600">{formatDate(season.start_date)} to {formatDate(season.end_date)}</div>
+                <div className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-400">{season.status}</div>
+              </Link>
+            ))}
+          </div>
+        </article>
       </div>
-    </main>
+    </SiteShell>
   );
 }
