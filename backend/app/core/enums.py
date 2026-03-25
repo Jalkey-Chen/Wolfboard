@@ -93,3 +93,28 @@ class GameStatus(str, Enum):
     CONFIRMED = "confirmed"
     REVISED = "revised"
     CANCELLED = "cancelled"
+
+
+class GamePlayerFaction(str, Enum):
+    """Faction values stored for player rows in a game result."""
+
+    GOOD = "good"
+    WOLF = "wolf"
+    THIRD_PARTY = "third_party"
+
+
+class GamePlayerFinalStatus(str, Enum):
+    """Final lifecycle state recorded for a player at game end."""
+
+    ALIVE = "alive"
+    ELIMINATED = "eliminated"
+    UNKNOWN = "unknown"
+
+
+class ScoreAdjustmentType(str, Enum):
+    """Adjustment categories supported in the MVP result-entry flow."""
+
+    LATE_PENALTY = "late_penalty"
+    CONDUCT_PENALTY = "conduct_penalty"
+    JUDGE_BONUS = "judge_bonus"
+    MANUAL_ADJUSTMENT = "manual_adjustment"

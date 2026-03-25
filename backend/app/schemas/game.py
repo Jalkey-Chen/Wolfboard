@@ -93,6 +93,7 @@ class GameDetail(GameSummary):
     event_day_venue: str
     format: GameFormatOptionRead
     judge: GameJudgeRead
+    has_result_draft: bool
     submitted_at: datetime | None
     submitted_by: int | None
     confirmed_at: datetime | None

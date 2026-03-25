@@ -70,6 +70,14 @@ USER_SEED = [
         "email": "player@example.com",
         "roles": ["player"],
     },
+] + [
+    {
+        "username": f"sample_player_{index:02d}",
+        "display_name": f"Sample Player {index:02d}",
+        "email": f"sample_player_{index:02d}@example.com",
+        "roles": ["player"],
+    }
+    for index in range(1, 11)
 ]
 
 DEFAULT_PASSWORD = "password123"
@@ -403,8 +411,8 @@ def seed_seasons_and_event_days() -> None:
 def seed_registrations() -> None:
     """Create sample registrations used to test signup and admin check-in flows.
 
-    The open event day intentionally leaves `player_user` unregistered so the
-    player validation path can exercise a real signup from the UI or API.
+    The open event day now includes enough registered users to support Milestone
+    4 result-entry testing against a 12-player format.
     """
 
     with SessionLocal() as db:
@@ -427,6 +435,22 @@ def seed_registrations() -> None:
                 "note": "Waitlist sample.",
             },
             {
+                "event_title": OPEN_EVENT_DAY_TITLE,
+                "username": "admin_user",
+                "registration_status": RegistrationStatus.REGISTERED,
+                "check_in_status": CheckInStatus.CHECKED_IN,
+                "registration_type": RegistrationType.GUEST,
+                "note": "Admin registered as a sample player option.",
+            },
+            {
+                "event_title": OPEN_EVENT_DAY_TITLE,
+                "username": "player_user",
+                "registration_status": RegistrationStatus.REGISTERED,
+                "check_in_status": CheckInStatus.CHECKED_IN,
+                "registration_type": RegistrationType.MAIN,
+                "note": "Primary sample player.",
+            },
+            {
                 "event_title": CLOSED_EVENT_DAY_TITLE,
                 "username": "admin_user",
                 "registration_status": RegistrationStatus.REGISTERED,
@@ -442,6 +466,16 @@ def seed_registrations() -> None:
                 "registration_type": RegistrationType.MAIN,
                 "note": "Absent sample.",
             },
+        ] + [
+            {
+                "event_title": OPEN_EVENT_DAY_TITLE,
+                "username": f"sample_player_{index:02d}",
+                "registration_status": RegistrationStatus.REGISTERED,
+                "check_in_status": CheckInStatus.CHECKED_IN,
+                "registration_type": RegistrationType.MAIN,
+                "note": "Seeded open-event player for result-entry testing.",
+            }
+            for index in range(1, 11)
         ]
         desired_pairs = {
             (event_days_by_title[payload["event_title"]].id, users_by_username[payload["username"]].id)
@@ -456,6 +490,9 @@ def seed_registrations() -> None:
             users_by_username["admin_user"].id,
             users_by_username["judge_user"].id,
             users_by_username["player_user"].id,
+        } | {
+            users_by_username[f"sample_player_{index:02d}"].id
+            for index in range(1, 11)
         }
 
         stale_registrations = db.scalars(
