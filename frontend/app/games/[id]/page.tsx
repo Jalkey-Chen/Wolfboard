@@ -47,7 +47,10 @@ export default function GameDetailPage() {
     }
 
     const canOpenResultPage =
-      userIsAdmin || (userIsJudge && profile.user.id === game.judge_user_id);
+      userIsAdmin ||
+      (userIsJudge && profile.user.id === game.judge_user_id) ||
+      game.status === "confirmed" ||
+      game.status === "revised";
     if (!canOpenResultPage) {
       setResultDraft(null);
       return;
@@ -75,6 +78,7 @@ export default function GameDetailPage() {
     userIsJudge &&
     profile.user.id === game.judge_user_id &&
     (game.status === "draft" || game.status === "in_progress");
+  const canReviewResult = game !== null && userIsAdmin && game.status === "submitted";
 
   return (
     <SiteShell
@@ -90,6 +94,14 @@ export default function GameDetailPage() {
                 href={`/judge/games/${game.id}/result`}
               >
                 {canEditResult ? "Enter Result" : "View Result"}
+              </Link>
+            ) : null}
+            {canReviewResult ? (
+              <Link
+                className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
+                href={`/admin/games/${game.id}/review`}
+              >
+                Review Result
               </Link>
             ) : null}
             {userIsAdmin ? (

@@ -75,6 +75,24 @@ class Game(Base):
         cascade="all, delete-orphan",
         order_by="GamePlayer.seat_number.asc()",
     )
+    score_logs = relationship(
+        "ScoreLog",
+        back_populates="game",
+        cascade="all, delete-orphan",
+        order_by="ScoreLog.created_at.asc()",
+    )
+    result_confirmations = relationship(
+        "ResultConfirmation",
+        back_populates="game",
+        cascade="all, delete-orphan",
+        order_by="ResultConfirmation.created_at.desc()",
+    )
+    status_history = relationship(
+        "GameStatusHistory",
+        back_populates="game",
+        cascade="all, delete-orphan",
+        order_by="GameStatusHistory.created_at.desc()",
+    )
 
     @property
     def season_id(self) -> int | None:

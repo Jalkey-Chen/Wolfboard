@@ -8,9 +8,17 @@ from app.core.dependencies import get_current_user, require_role
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.game import GameCreate, GameDetail, GameSummary, JudgeOptionRead, GameUpdate
+from app.schemas.game_review import GameConfirmRequest, GameRejectRequest, GameReviewSummary, GameRevisionWrite
 from app.schemas.game_result import GameResultDraftRead, GameResultDraftWrite
 from app.services.event_day import get_event_day_or_404
 from app.services.game import create_game, get_game_or_404, list_games_for_event_day, list_games_for_judge, update_game
+from app.services.game_review import (
+    confirm_game_result,
+    get_review_game_or_404,
+    list_submitted_games_for_review,
+    reject_game_result,
+    revise_game_result,
+)
 from app.services.game_result import (
     build_game_result_response,
     ensure_can_view_game_result,
@@ -88,6 +96,17 @@ def read_game(
     return build_game_detail_payload(game_id, db, current_user)
 
 
+@router.get("/admin/games/review", response_model=list[GameReviewSummary])
+def read_review_queue(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+) -> list[GameReviewSummary]:
+    """Return submitted games waiting for admin review."""
+
+    _ = current_user
+    return list_submitted_games_for_review(db)
+
+
 @router.get("/games/{game_id}/result-draft", response_model=GameResultDraftRead)
 def read_game_result_draft(
     game_id: int,
@@ -125,6 +144,48 @@ def submit_game_result_endpoint(
 
     game = get_game_result_or_404(db, game_id)
     game = submit_game_result(db, game, current_user)
+    return build_game_result_response(game, current_user)
+
+
+@router.post("/games/{game_id}/confirm-result", response_model=GameResultDraftRead)
+def confirm_game_result_endpoint(
+    game_id: int,
+    payload: GameConfirmRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+) -> GameResultDraftRead:
+    """Confirm a submitted result and make its score logs effective."""
+
+    game = get_review_game_or_404(db, game_id)
+    game = confirm_game_result(db, game, current_user, comment=payload.comment)
+    return build_game_result_response(game, current_user)
+
+
+@router.post("/games/{game_id}/reject-result", response_model=GameResultDraftRead)
+def reject_game_result_endpoint(
+    game_id: int,
+    payload: GameRejectRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+) -> GameResultDraftRead:
+    """Reject a submitted result and return it to draft status."""
+
+    game = get_review_game_or_404(db, game_id)
+    game = reject_game_result(db, game, current_user, comment=payload.comment)
+    return build_game_result_response(game, current_user)
+
+
+@router.post("/games/{game_id}/revise-result", response_model=GameResultDraftRead)
+def revise_game_result_endpoint(
+    game_id: int,
+    payload: GameRevisionWrite,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+) -> GameResultDraftRead:
+    """Apply an admin revision and rebuild the formal score ledger."""
+
+    game = get_review_game_or_404(db, game_id)
+    game = revise_game_result(db, game, payload, current_user)
     return build_game_result_response(game, current_user)
 
 
