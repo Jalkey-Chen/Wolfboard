@@ -170,6 +170,11 @@ export type GameDetail = GameSummary & {
   confirmed_by: number | null;
 };
 
+export type GameReviewSummary = GameSummary & {
+  submitted_at: string | null;
+  submitted_by: number | null;
+};
+
 export type ValidationMessage = {
   code: string;
   message: string;
@@ -209,6 +214,10 @@ export type GameResultAdjustmentPayload = {
 export type GameResultDraftWritePayload = {
   players: GameResultPlayerDraftPayload[];
   adjustments: GameResultAdjustmentPayload[];
+};
+
+export type GameRevisionWritePayload = GameResultDraftWritePayload & {
+  reason: string;
 };
 
 export type GameResultPlayerRecord = {
@@ -251,6 +260,50 @@ export type GameResultDraftResponse = {
   selectable_players: SelectablePlayerRecord[];
   validation: ValidationSummary;
   editable: boolean;
+};
+
+export type GameConfirmPayload = {
+  comment?: string | null;
+};
+
+export type GameRejectPayload = {
+  comment: string;
+};
+
+export type LeaderboardEntry = {
+  ranking: number;
+  user_id: number;
+  username: string;
+  display_name: string;
+  total_score: number;
+  games_played: number;
+  wins: number;
+};
+
+export type PlayerProfileHistoryRecord = {
+  game_id: number;
+  season_id: number;
+  season_name: string;
+  event_day_id: number;
+  event_day_title: string;
+  event_day_date: string;
+  table_number: number;
+  game_number: number;
+  game_type: GameType;
+  game_status: GameStatus;
+  delta: number;
+  balance_after: number;
+  effective_status: "pending" | "effective" | "voided";
+  created_at: string;
+};
+
+export type PlayerProfileRecord = {
+  user_id: number;
+  username: string;
+  display_name: string;
+  total_score: number;
+  games_played: number;
+  history: PlayerProfileHistoryRecord[];
 };
 
 export type EventDayDetail = EventDaySummary & {
@@ -568,6 +621,47 @@ export function submitGameResult(
 }
 
 
+export function getReviewQueue(token: string): Promise<GameReviewSummary[]> {
+  return request<GameReviewSummary[]>("/admin/games/review", withAuth(token));
+}
+
+
+export function confirmGameResult(
+  token: string,
+  gameId: number,
+  payload: GameConfirmPayload = {},
+): Promise<GameResultDraftResponse> {
+  return request<GameResultDraftResponse>(`/games/${gameId}/confirm-result`, withAuth(token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }));
+}
+
+
+export function rejectGameResult(
+  token: string,
+  gameId: number,
+  payload: GameRejectPayload,
+): Promise<GameResultDraftResponse> {
+  return request<GameResultDraftResponse>(`/games/${gameId}/reject-result`, withAuth(token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }));
+}
+
+
+export function reviseGameResult(
+  token: string,
+  gameId: number,
+  payload: GameRevisionWritePayload,
+): Promise<GameResultDraftResponse> {
+  return request<GameResultDraftResponse>(`/games/${gameId}/revise-result`, withAuth(token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }));
+}
+
+
 export function updateGame(
   token: string,
   gameId: number,
@@ -591,4 +685,20 @@ export function getJudgeOwnedGames(
 
 export function getJudgeOptions(token: string): Promise<JudgeOptionRecord[]> {
   return request<JudgeOptionRecord[]>("/users/judges", withAuth(token));
+}
+
+
+export function getSeasonLeaderboard(
+  token: string,
+  seasonId: number,
+): Promise<LeaderboardEntry[]> {
+  return request<LeaderboardEntry[]>(`/seasons/${seasonId}/leaderboard`, withAuth(token));
+}
+
+
+export function getPlayerProfile(
+  token: string,
+  playerId: number,
+): Promise<PlayerProfileRecord> {
+  return request<PlayerProfileRecord>(`/players/${playerId}/profile`, withAuth(token));
 }

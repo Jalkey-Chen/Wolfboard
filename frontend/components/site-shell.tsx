@@ -63,6 +63,12 @@ export function SiteShell({
                 <Link className="rounded-full bg-slate-100 px-4 py-2 hover:bg-slate-200" href="/formats">
                   Formats
                 </Link>
+                <Link className="rounded-full bg-slate-100 px-4 py-2 hover:bg-slate-200" href="/leaderboard">
+                  Leaderboard
+                </Link>
+                <Link className="rounded-full bg-slate-100 px-4 py-2 hover:bg-slate-200" href={`/players/${profile.user.id}`}>
+                  My Profile
+                </Link>
                 {/* Judge navigation is intentionally role-aware because the page
                     represents an owned work queue rather than a public index. */}
                 {canOpenJudgeQueue ? (
@@ -71,9 +77,14 @@ export function SiteShell({
                   </Link>
                 ) : null}
                 {isAdmin ? (
-                  <Link className="rounded-full bg-slate-100 px-4 py-2 hover:bg-slate-200" href="/admin/seasons">
-                    Admin Seasons
-                  </Link>
+                  <>
+                    <Link className="rounded-full bg-slate-100 px-4 py-2 hover:bg-slate-200" href="/admin/seasons">
+                      Admin Seasons
+                    </Link>
+                    <Link className="rounded-full bg-slate-100 px-4 py-2 hover:bg-slate-200" href="/admin/games/review">
+                      Review Results
+                    </Link>
+                  </>
                 ) : null}
               </nav>
             </div>
