@@ -3,11 +3,13 @@
 /** Sign-out control that clears the locally stored access token. */
 import { useRouter } from "next/navigation";
 
+import { useI18n } from "@/components/language-provider";
 import { clearStoredAccessToken } from "@/lib/auth";
 
 
 export function LogoutButton() {
   const router = useRouter();
+  const { t } = useI18n();
 
   function handleLogout() {
     clearStoredAccessToken();
@@ -20,7 +22,7 @@ export function LogoutButton() {
       onClick={handleLogout}
       type="button"
     >
-      Sign out
+      {t("auth.signOut")}
     </button>
   );
 }

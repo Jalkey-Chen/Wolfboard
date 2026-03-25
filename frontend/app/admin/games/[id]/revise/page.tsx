@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useMemo, useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 
+import { useI18n } from "@/components/language-provider";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { formatDate, formatDateTime } from "@/lib/date";
+import { getMetaLabelClass } from "@/lib/i18n";
 import {
   ApiRequestError,
   getGameResultDraft,
@@ -117,6 +119,7 @@ function parseValidationFromError(error: unknown): ValidationSummary | null {
 export default function AdminGameRevisionPage() {
   const params = useParams<{ id: string }>();
   const gameId = Number(params.id);
+  const { t, enumLabel, language } = useI18n();
   const { token, profile, isLoading } = useAuthenticatedSession({ requiredRole: "admin" });
   const [draft, setDraft] = useState<GameResultDraftResponse | null>(null);
   const [playerRows, setPlayerRows] = useState<EditableGameResultPlayer[]>([]);
@@ -139,9 +142,9 @@ export default function AdminGameRevisionPage() {
         setRemoteValidation(response.validation);
       })
       .catch((error) => {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to load the revision payload.");
+        setErrorMessage(error instanceof Error ? error.message : t("common.failedToLoad"));
       });
-  }, [gameId, profile, token]);
+  }, [gameId, profile, t, token]);
 
   const localValidation = useMemo(() => {
     if (!draft) {
@@ -174,6 +177,7 @@ export default function AdminGameRevisionPage() {
 
   const validation = remoteValidation ?? localValidation;
   const isReadOnly = !draft || !["submitted", "confirmed", "revised"].includes(draft.game.status);
+  const metaLabelClass = getMetaLabelClass(language);
 
   function resetValidationFeedback() {
     setErrorMessage(null);
@@ -214,7 +218,7 @@ export default function AdminGameRevisionPage() {
       setRemoteValidation(response.validation);
       setRevisionReason("");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to submit the revision.");
+      setErrorMessage(error instanceof Error ? error.message : t("common.failedToLoad"));
       setRemoteValidation(parseValidationFromError(error));
     } finally {
       setIsSubmitting(false);
@@ -222,7 +226,7 @@ export default function AdminGameRevisionPage() {
   }
 
   if (isLoading) {
-    return <PageLoading message="Loading revision editor..." />;
+    return <PageLoading message={`${t("review.reviseTitle")}...`} />;
   }
 
   if (!profile || Number.isNaN(gameId)) {
@@ -232,8 +236,8 @@ export default function AdminGameRevisionPage() {
   return (
     <SiteShell
       profile={profile}
-      title={draft ? `Revise Result · Table ${draft.game.table_number} / Game ${draft.game.game_number}` : "Revise Result"}
-      description={draft ? `${draft.game.season_name} · ${draft.game.event_day_title}` : "Admin revision editor."}
+      title={draft ? `${t("review.reviseTitle")} · ${draft.game.table_number}桌 / 第${draft.game.game_number}局` : t("review.reviseTitle")}
+      description={draft ? `${draft.game.season_name} · ${draft.game.event_day_title}` : t("review.reviseTitle")}
       actions={
         draft ? (
           <div className="flex flex-wrap gap-3">
@@ -241,7 +245,7 @@ export default function AdminGameRevisionPage() {
               className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
               href={`/admin/games/${draft.game.id}/review`}
             >
-              Back to Review
+              {t("common.back")}
             </Link>
             {!isReadOnly ? (
               <button
@@ -250,7 +254,7 @@ export default function AdminGameRevisionPage() {
                 onClick={() => void handleSubmitRevision()}
                 type="button"
               >
-                {isSubmitting ? "Submitting..." : "Submit Revision"}
+                {isSubmitting ? t("resultEntry.submitting") : t("review.reviseResult")}
               </button>
             ) : null}
           </div>
@@ -265,39 +269,39 @@ export default function AdminGameRevisionPage() {
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Season</div>
+                  <div className={metaLabelClass}>{t("common.season")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{draft.game.season_name}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Event Day</div>
+                  <div className={metaLabelClass}>{t("common.eventDay")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{draft.game.event_day_title}</div>
                   <div className="mt-1 text-xs text-slate-500">{formatDate(draft.game.event_day_date)}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Format</div>
+                  <div className={metaLabelClass}>{t("common.format")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{draft.game.format.format_name}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Judge</div>
+                  <div className={metaLabelClass}>{t("common.judge")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{draft.game.judge.display_name}</div>
                 </div>
               </div>
 
               <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Table</div>
+                  <div className={metaLabelClass}>{t("resultEntry.tableNumber")}</div>
                   <div className="mt-2 text-sm text-slate-700">{draft.game.table_number}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Game Number</div>
+                  <div className={metaLabelClass}>{t("resultEntry.gameNumber")}</div>
                   <div className="mt-2 text-sm text-slate-700">{draft.game.game_number}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Current Status</div>
-                  <div className="mt-2 text-sm text-slate-700">{draft.game.status}</div>
+                  <div className={metaLabelClass}>{t("common.currentStatus")}</div>
+                  <div className="mt-2 text-sm text-slate-700">{enumLabel("gameStatus", draft.game.status)}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Submitted At</div>
+                  <div className={metaLabelClass}>{t("resultEntry.submittedAt")}</div>
                   <div className="mt-2 text-sm text-slate-700">{formatDateTime(draft.game.submitted_at)}</div>
                 </div>
               </div>
@@ -305,7 +309,7 @@ export default function AdminGameRevisionPage() {
 
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-2xl font-bold text-ink">Player Results</h2>
+                <h2 className="text-2xl font-bold text-ink">{t("resultEntry.playerResults")}</h2>
                 {!isReadOnly ? (
                   <button
                     className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
@@ -315,7 +319,7 @@ export default function AdminGameRevisionPage() {
                     }}
                     type="button"
                   >
-                    Add Player Row
+                    {t("resultEntry.addPlayerRow")}
                   </button>
                 ) : null}
               </div>
@@ -324,14 +328,14 @@ export default function AdminGameRevisionPage() {
                 <table className="min-w-full divide-y divide-slate-200 text-sm">
                   <thead>
                     <tr className="text-left text-slate-500">
-                      <th className="px-3 py-3 font-semibold">Seat</th>
-                      <th className="px-3 py-3 font-semibold">Player</th>
-                      <th className="px-3 py-3 font-semibold">Role</th>
-                      <th className="px-3 py-3 font-semibold">Faction</th>
-                      <th className="px-3 py-3 font-semibold">Winner</th>
-                      <th className="px-3 py-3 font-semibold">Final Status</th>
-                      <th className="px-3 py-3 font-semibold">Remarks</th>
-                      {!isReadOnly ? <th className="px-3 py-3 font-semibold">Action</th> : null}
+                      <th className="px-3 py-3 font-semibold">{t("common.seat")}</th>
+                      <th className="px-3 py-3 font-semibold">{t("common.player")}</th>
+                      <th className="px-3 py-3 font-semibold">{t("common.role")}</th>
+                      <th className="px-3 py-3 font-semibold">{t("common.faction")}</th>
+                      <th className="px-3 py-3 font-semibold">{t("common.winner")}</th>
+                      <th className="px-3 py-3 font-semibold">{t("resultEntry.finalStatus")}</th>
+                      <th className="px-3 py-3 font-semibold">{t("common.note")}</th>
+                      {!isReadOnly ? <th className="px-3 py-3 font-semibold">{t("common.actions")}</th> : null}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -366,7 +370,7 @@ export default function AdminGameRevisionPage() {
                             }}
                             value={player.user_id ?? ""}
                           >
-                            <option value="">Select player</option>
+                            <option value="">{t("resultEntry.selectPlayer")}</option>
                             {draft.selectable_players.map((option) => (
                               <option key={option.user_id} value={option.user_id}>
                                 {option.display_name} ({option.username})
@@ -401,10 +405,10 @@ export default function AdminGameRevisionPage() {
                             }}
                             value={player.faction ?? ""}
                           >
-                            <option value="">Select faction</option>
+                            <option value="">{t("resultEntry.selectFaction")}</option>
                             {playerFactions.map((faction) => (
                               <option key={faction} value={faction}>
-                                {faction}
+                                {enumLabel("gamePlayerFaction", faction)}
                               </option>
                             ))}
                           </select>
@@ -423,9 +427,9 @@ export default function AdminGameRevisionPage() {
                             }}
                             value={player.is_winner === null ? "" : String(player.is_winner)}
                           >
-                            <option value="">Select</option>
-                            <option value="true">Win</option>
-                            <option value="false">Lose</option>
+                            <option value="">{t("common.select")}</option>
+                            <option value="true">{t("common.win")}</option>
+                            <option value="false">{t("common.lose")}</option>
                           </select>
                         </td>
                         <td className="px-3 py-4">
@@ -442,7 +446,7 @@ export default function AdminGameRevisionPage() {
                           >
                             {finalStatuses.map((finalStatus) => (
                               <option key={finalStatus} value={finalStatus}>
-                                {finalStatus}
+                                {enumLabel("gamePlayerFinalStatus", finalStatus)}
                               </option>
                             ))}
                           </select>
@@ -470,7 +474,7 @@ export default function AdminGameRevisionPage() {
                               }}
                               type="button"
                             >
-                              Remove
+                              {t("common.remove")}
                             </button>
                           </td>
                         ) : null}
@@ -488,7 +492,7 @@ export default function AdminGameRevisionPage() {
 
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-2xl font-bold text-ink">Adjustments</h2>
+                <h2 className="text-2xl font-bold text-ink">{t("resultEntry.adjustments")}</h2>
                 {!isReadOnly ? (
                   <button
                     className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
@@ -498,7 +502,7 @@ export default function AdminGameRevisionPage() {
                     }}
                     type="button"
                   >
-                    Add Adjustment
+                    {t("resultEntry.addAdjustment")}
                   </button>
                 ) : null}
               </div>
@@ -507,11 +511,11 @@ export default function AdminGameRevisionPage() {
                 <table className="min-w-full divide-y divide-slate-200 text-sm">
                   <thead>
                     <tr className="text-left text-slate-500">
-                      <th className="px-3 py-3 font-semibold">Target Seat</th>
-                      <th className="px-3 py-3 font-semibold">Type</th>
-                      <th className="px-3 py-3 font-semibold">Delta</th>
-                      <th className="px-3 py-3 font-semibold">Reason</th>
-                      {!isReadOnly ? <th className="px-3 py-3 font-semibold">Action</th> : null}
+                      <th className="px-3 py-3 font-semibold">{t("resultEntry.targetSeat")}</th>
+                      <th className="px-3 py-3 font-semibold">{t("common.type")}</th>
+                      <th className="px-3 py-3 font-semibold">{t("resultEntry.delta")}</th>
+                      <th className="px-3 py-3 font-semibold">{t("common.reason")}</th>
+                      {!isReadOnly ? <th className="px-3 py-3 font-semibold">{t("common.actions")}</th> : null}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -530,12 +534,12 @@ export default function AdminGameRevisionPage() {
                             }}
                             value={adjustment.target_seat_number ?? ""}
                           >
-                            <option value="">Select seat</option>
+                            <option value="">{t("resultEntry.selectSeat")}</option>
                             {playerRows
                               .filter((player) => player.seat_number !== null)
                               .map((player) => (
                                 <option key={`${adjustment.row_id}-${player.row_id}`} value={player.seat_number ?? ""}>
-                                  Seat {player.seat_number}
+                                  {t("common.seat")} {player.seat_number}
                                 </option>
                               ))}
                           </select>
@@ -554,7 +558,7 @@ export default function AdminGameRevisionPage() {
                           >
                             {adjustmentTypes.map((adjustmentType) => (
                               <option key={adjustmentType} value={adjustmentType}>
-                                {adjustmentType}
+                                {enumLabel("scoreAdjustmentType", adjustmentType)}
                               </option>
                             ))}
                           </select>
@@ -597,7 +601,7 @@ export default function AdminGameRevisionPage() {
                               }}
                               type="button"
                             >
-                              Remove
+                              {t("common.remove")}
                             </button>
                           </td>
                         ) : null}
@@ -609,16 +613,16 @@ export default function AdminGameRevisionPage() {
             </section>
 
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
-              <h2 className="text-2xl font-bold text-ink">Score Preview</h2>
+              <h2 className="text-2xl font-bold text-ink">{t("resultEntry.scorePreview")}</h2>
               <div className="mt-5 overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200 text-sm">
                   <thead>
                     <tr className="text-left text-slate-500">
-                      <th className="px-3 py-3 font-semibold">Seat</th>
-                      <th className="px-3 py-3 font-semibold">Player</th>
-                      <th className="px-3 py-3 font-semibold">Base</th>
-                      <th className="px-3 py-3 font-semibold">Adjustment</th>
-                      <th className="px-3 py-3 font-semibold">Final</th>
+                      <th className="px-3 py-3 font-semibold">{t("common.seat")}</th>
+                      <th className="px-3 py-3 font-semibold">{t("common.player")}</th>
+                      <th className="px-3 py-3 font-semibold">{t("resultEntry.base")}</th>
+                      <th className="px-3 py-3 font-semibold">{t("resultEntry.adjustment")}</th>
+                      <th className="px-3 py-3 font-semibold">{t("resultEntry.final")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -627,8 +631,8 @@ export default function AdminGameRevisionPage() {
                       const playerOption = player.user_id !== null ? selectablePlayersById.get(player.user_id) : null;
                       return (
                         <tr key={`admin-preview-${player.row_id}`}>
-                          <td className="px-3 py-4 text-slate-700">{player.seat_number ?? "Not set"}</td>
-                          <td className="px-3 py-4 text-slate-700">{playerOption?.display_name ?? "Not selected"}</td>
+                          <td className="px-3 py-4 text-slate-700">{player.seat_number ?? t("common.notSet")}</td>
+                          <td className="px-3 py-4 text-slate-700">{playerOption?.display_name ?? t("resultEntry.notSelected")}</td>
                           <td className="px-3 py-4 text-slate-700">{preview.base_score}</td>
                           <td className="px-3 py-4 text-slate-700">{preview.adjustment_score}</td>
                           <td className="px-3 py-4 font-semibold text-ink">{preview.final_score}</td>
@@ -641,29 +645,29 @@ export default function AdminGameRevisionPage() {
             </section>
 
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
-              <h2 className="text-2xl font-bold text-ink">Validation</h2>
+              <h2 className="text-2xl font-bold text-ink">{t("resultEntry.validation")}</h2>
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-4">
-                  <div className="text-sm font-semibold text-red-700">Errors</div>
+                  <div className="text-sm font-semibold text-red-700">{t("resultEntry.errors")}</div>
                   <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-red-700">
                     {validation.errors.length > 0 ? (
                       validation.errors.map((message, index) => (
                         <li key={`admin-error-${message.code}-${index}`}>{message.message}</li>
                       ))
                     ) : (
-                      <li>No blocking errors.</li>
+                      <li>{t("common.noErrors")}</li>
                     )}
                   </ul>
                 </div>
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
-                  <div className="text-sm font-semibold text-amber-800">Warnings</div>
+                  <div className="text-sm font-semibold text-amber-800">{t("resultEntry.warnings")}</div>
                   <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-amber-800">
                     {validation.warnings.length > 0 ? (
                       validation.warnings.map((message, index) => (
                         <li key={`admin-warning-${message.code}-${index}`}>{message.message}</li>
                       ))
                     ) : (
-                      <li>No warnings.</li>
+                      <li>{t("common.noWarnings")}</li>
                     )}
                   </ul>
                 </div>
@@ -672,14 +676,14 @@ export default function AdminGameRevisionPage() {
 
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
               <label className="text-sm font-semibold text-slate-700" htmlFor="revision-reason">
-                Revision Reason
+                {t("review.revisionReason")}
               </label>
               <textarea
                 className="mt-3 min-h-28 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"
                 disabled={isReadOnly}
                 id="revision-reason"
                 onChange={(event) => setRevisionReason(event.target.value)}
-                placeholder="Explain why the result is being revised."
+                placeholder={t("review.revisionReason")}
                 value={revisionReason}
               />
             </section>

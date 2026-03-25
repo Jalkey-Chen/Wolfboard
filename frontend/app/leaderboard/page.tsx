@@ -7,6 +7,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { useI18n } from "@/components/language-provider";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { getSeasonLeaderboard, getSeasons, type LeaderboardEntry, type SeasonRecord } from "@/lib/api";
@@ -14,6 +15,7 @@ import { useAuthenticatedSession } from "@/lib/use-authenticated-session";
 
 
 export default function LeaderboardPage() {
+  const { t, enumLabel } = useI18n();
   const { token, profile, isLoading } = useAuthenticatedSession();
   const [seasons, setSeasons] = useState<SeasonRecord[]>([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState<number | null>(null);
@@ -32,9 +34,9 @@ export default function LeaderboardPage() {
         setSelectedSeasonId(activeSeason?.id ?? null);
       })
       .catch((error) => {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to load seasons.");
+        setErrorMessage(error instanceof Error ? error.message : t("seasons.loadError"));
       });
-  }, [profile, token]);
+  }, [profile, t, token]);
 
   useEffect(() => {
     if (!token || !selectedSeasonId) {
@@ -44,9 +46,9 @@ export default function LeaderboardPage() {
     void getSeasonLeaderboard(token, selectedSeasonId)
       .then((response) => setEntries(response))
       .catch((error) => {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to load the leaderboard.");
+        setErrorMessage(error instanceof Error ? error.message : t("leaderboard.loadError"));
       });
-  }, [selectedSeasonId, token]);
+  }, [selectedSeasonId, t, token]);
 
   const selectedSeason = useMemo(
     () => seasons.find((season) => season.id === selectedSeasonId) ?? null,
@@ -54,7 +56,7 @@ export default function LeaderboardPage() {
   );
 
   if (isLoading) {
-    return <PageLoading message="Loading leaderboard..." />;
+    return <PageLoading message={t("leaderboard.loading")} />;
   }
 
   if (!profile) {
@@ -64,8 +66,8 @@ export default function LeaderboardPage() {
   return (
     <SiteShell
       profile={profile}
-      title="Leaderboard"
-      description="Official standings built from effective score logs for confirmed and revised official games."
+      title={t("leaderboard.title")}
+      description={t("leaderboard.description")}
     >
       <div className="flex flex-col gap-5">
         {errorMessage ? <PageError message={errorMessage} /> : null}
@@ -73,9 +75,9 @@ export default function LeaderboardPage() {
         <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-2xl font-bold text-ink">Season Selection</h2>
+              <h2 className="text-2xl font-bold text-ink">{t("leaderboard.seasonSelection")}</h2>
               <p className="mt-2 text-sm text-slate-600">
-                {selectedSeason ? `${selectedSeason.name} · ${selectedSeason.status}` : "No season selected."}
+                {selectedSeason ? `${selectedSeason.name} · ${enumLabel("seasonStatus", selectedSeason.status)}` : t("leaderboard.noSeasonSelected")}
               </p>
             </div>
             <select
@@ -93,16 +95,16 @@ export default function LeaderboardPage() {
         </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
-          <h2 className="text-2xl font-bold text-ink">Standings</h2>
+          <h2 className="text-2xl font-bold text-ink">{t("leaderboard.standings")}</h2>
           <div className="mt-5 overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead>
                 <tr className="text-left text-slate-500">
-                  <th className="px-3 py-3 font-semibold">Rank</th>
-                  <th className="px-3 py-3 font-semibold">Player</th>
-                  <th className="px-3 py-3 font-semibold">Total Score</th>
-                  <th className="px-3 py-3 font-semibold">Games</th>
-                  <th className="px-3 py-3 font-semibold">Wins</th>
+                  <th className="px-3 py-3 font-semibold">{t("leaderboard.rank")}</th>
+                  <th className="px-3 py-3 font-semibold">{t("common.player")}</th>
+                  <th className="px-3 py-3 font-semibold">{t("leaderboard.totalScore")}</th>
+                  <th className="px-3 py-3 font-semibold">{t("leaderboard.games")}</th>
+                  <th className="px-3 py-3 font-semibold">{t("leaderboard.wins")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -123,7 +125,7 @@ export default function LeaderboardPage() {
                 {entries.length === 0 ? (
                   <tr>
                     <td className="px-3 py-4 text-slate-600" colSpan={5}>
-                      No effective official score logs exist for the selected season yet.
+                      {t("leaderboard.noEntries")}
                     </td>
                   </tr>
                 ) : null}
@@ -135,4 +137,3 @@ export default function LeaderboardPage() {
     </SiteShell>
   );
 }
-

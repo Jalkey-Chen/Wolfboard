@@ -11,9 +11,11 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
+import { useI18n } from "@/components/language-provider";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { formatDate, formatDateTime } from "@/lib/date";
+import { getMetaLabelClass } from "@/lib/i18n";
 import {
   createEventDay,
   getSeason,
@@ -38,6 +40,7 @@ const eventDayStatuses: EventDayStatus[] = [
 export default function SeasonDetailPage() {
   const params = useParams<{ id: string }>();
   const seasonId = Number(params.id);
+  const { t, enumLabel, language } = useI18n();
   const { token, profile, isLoading, hasRole } = useAuthenticatedSession();
   const [season, setSeason] = useState<SeasonDetail | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -64,17 +67,19 @@ export default function SeasonDetailPage() {
         setSeason(response);
       })
       .catch((error) => {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to load the season.");
+        setErrorMessage(error instanceof Error ? error.message : t("seasons.detail.loadError"));
       });
-  }, [profile, seasonId, token]);
+  }, [profile, seasonId, t, token]);
 
   if (isLoading) {
-    return <PageLoading message="Loading season details..." />;
+    return <PageLoading message={t("seasons.detail.loading")} />;
   }
 
   if (!profile || Number.isNaN(seasonId)) {
     return null;
   }
+
+  const metaLabelClass = getMetaLabelClass(language);
 
   async function handleCreateEventDay(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -112,7 +117,7 @@ export default function SeasonDetailPage() {
         registration_close_at: "",
       });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to create the event day.");
+      setErrorMessage(error instanceof Error ? error.message : t("common.failedToLoad"));
     } finally {
       setIsCreatingEventDay(false);
     }
@@ -121,20 +126,20 @@ export default function SeasonDetailPage() {
   return (
     <SiteShell
       profile={profile}
-      title={season?.name ?? "Season"}
-      description={season?.description ?? "Season overview and event-day list."}
+      title={season?.name ?? t("seasons.title")}
+      description={season?.description ?? t("seasons.detail.description")}
       actions={
         hasRole("admin") ? (
           <div className="flex flex-wrap gap-3">
             <Link className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200" href="/admin/seasons">
-              Edit Season
+              {t("seasons.editSeason")}
             </Link>
             <button
               className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
               onClick={() => setShowCreateForm((value) => !value)}
               type="button"
             >
-              {showCreateForm ? "Hide Event Day Form" : "Create Event Day"}
+              {showCreateForm ? t("seasons.hideEventDayForm") : t("seasons.createEventDay")}
             </button>
           </div>
         ) : null
@@ -145,20 +150,23 @@ export default function SeasonDetailPage() {
 
         {season ? (
           <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
-            <h2 className="text-2xl font-bold text-ink">Season Overview</h2>
+            <h2 className="text-2xl font-bold text-ink">{t("seasons.overview")}</h2>
             <div className="mt-4 grid gap-4 md:grid-cols-3">
               <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Dates</div>
+                <div className={metaLabelClass}>{t("common.date")}</div>
                 <div className="mt-2 text-sm text-slate-700">
-                  {formatDate(season.start_date)} to {formatDate(season.end_date)}
+                  {t("common.datesRange", {
+                    start: formatDate(season.start_date),
+                    end: formatDate(season.end_date),
+                  })}
                 </div>
               </div>
               <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Status</div>
-                <div className="mt-2 text-sm text-slate-700">{season.status}</div>
+                <div className={metaLabelClass}>{t("common.status")}</div>
+                <div className="mt-2 text-sm text-slate-700">{enumLabel("seasonStatus", season.status)}</div>
               </div>
               <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Event Days</div>
+                <div className={metaLabelClass}>{t("seasons.eventDaysCount")}</div>
                 <div className="mt-2 text-sm text-slate-700">{season.event_days.length}</div>
               </div>
             </div>
@@ -167,19 +175,19 @@ export default function SeasonDetailPage() {
 
         {hasRole("admin") && showCreateForm ? (
           <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
-            <h2 className="text-2xl font-bold text-ink">Create Event Day</h2>
+            <h2 className="text-2xl font-bold text-ink">{t("seasons.createEventDayTitle")}</h2>
             <form className="mt-5 grid gap-4 md:grid-cols-2" onSubmit={handleCreateEventDay}>
               <input
                 className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
                 onChange={(event) => setFormState((current) => ({ ...current, title: event.target.value }))}
-                placeholder="Title"
+                placeholder={t("eventDay.title")}
                 required
                 value={formState.title}
               />
               <input
                 className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
                 onChange={(event) => setFormState((current) => ({ ...current, venue: event.target.value }))}
-                placeholder="Venue"
+                placeholder={t("common.venue")}
                 required
                 value={formState.venue}
               />
@@ -197,7 +205,7 @@ export default function SeasonDetailPage() {
               >
                 {eventDayCategories.map((category) => (
                   <option key={category} value={category}>
-                    {category}
+                    {enumLabel("eventDayCategory", category)}
                   </option>
                 ))}
               </select>
@@ -220,14 +228,14 @@ export default function SeasonDetailPage() {
               >
                 {eventDayStatuses.map((status) => (
                   <option key={status} value={status}>
-                    {status}
+                    {enumLabel("eventDayStatus", status)}
                   </option>
                 ))}
               </select>
               <textarea
                 className="min-h-28 rounded-2xl border border-slate-200 px-4 py-3 text-sm md:col-span-2"
                 onChange={(event) => setFormState((current) => ({ ...current, notes: event.target.value }))}
-                placeholder="Notes"
+                placeholder={t("common.note")}
                 value={formState.notes}
               />
               <div className="md:col-span-2">
@@ -236,7 +244,7 @@ export default function SeasonDetailPage() {
                   disabled={isCreatingEventDay}
                   type="submit"
                 >
-                  {isCreatingEventDay ? "Creating..." : "Create Event Day"}
+                  {isCreatingEventDay ? `${t("common.create")}...` : t("seasons.createEventDay")}
                 </button>
               </div>
             </form>
@@ -244,7 +252,7 @@ export default function SeasonDetailPage() {
         ) : null}
 
         <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
-          <h2 className="text-2xl font-bold text-ink">Event Days</h2>
+          <h2 className="text-2xl font-bold text-ink">{t("seasons.eventDays")}</h2>
           <div className="mt-5 grid gap-4">
             {season?.event_days.map((eventDay) => (
               <div key={eventDay.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
@@ -255,19 +263,22 @@ export default function SeasonDetailPage() {
                       {formatDate(eventDay.event_date)} · {eventDay.venue}
                     </p>
                     <p className="mt-2 text-sm text-slate-600">
-                      Status: {eventDay.status} · Category: {eventDay.category}
+                      {t("common.status")}: {enumLabel("eventDayStatus", eventDay.status)} · {t("common.category")}: {enumLabel("eventDayCategory", eventDay.category)}
                     </p>
                     <p className="mt-2 text-sm text-slate-600">
-                      Registration window: {formatDateTime(eventDay.registration_open_at)} to {formatDateTime(eventDay.registration_close_at)}
+                      {t("common.registrationWindow")}: {t("common.windowRange", {
+                        start: formatDateTime(eventDay.registration_open_at),
+                        end: formatDateTime(eventDay.registration_close_at),
+                      })}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-3">
                     <Link className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800" href={`/event-days/${eventDay.id}`}>
-                      View Event Day
+                      {t("seasons.viewEventDay")}
                     </Link>
                     {hasRole("admin") ? (
                       <Link className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200" href={`/admin/event-days/${eventDay.id}`}>
-                        Manage
+                        {t("seasons.manage")}
                       </Link>
                     ) : null}
                   </div>

@@ -1,10 +1,16 @@
+"use client";
+
 /** Shared loading and error blocks for data-driven pages. */
 
-export function PageLoading({ message = "Loading..." }: { message?: string }) {
+import { useI18n } from "@/components/language-provider";
+
+export function PageLoading({ message }: { message?: string }) {
+  const { t } = useI18n();
+
   return (
     <main className="flex min-h-screen items-center justify-center px-6">
       <div className="rounded-2xl border border-slate-200 bg-white/90 px-8 py-6 shadow-lg shadow-slate-200/60">
-        <p className="text-sm font-medium text-slate-600">{message}</p>
+        <p className="text-sm font-medium text-slate-600">{message ?? t("common.loading")}</p>
       </div>
     </main>
   );

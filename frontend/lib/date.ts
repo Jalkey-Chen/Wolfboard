@@ -1,5 +1,7 @@
 /** Small date helpers for display and form binding. */
 
+import { getLocaleForLanguage, getStoredLanguage } from "@/lib/i18n";
+
 function parseDateValue(value: string): Date {
   const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (dateOnlyMatch) {
@@ -13,12 +15,16 @@ function parseDateValue(value: string): Date {
   return new Date(value);
 }
 
+function resolveLocale(): string {
+  return getLocaleForLanguage(getStoredLanguage());
+}
+
 export function formatDate(value: string | null): string {
   if (!value) {
-    return "Not set";
+    return getStoredLanguage() === "zh" ? "未设置" : "Not set";
   }
 
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat(resolveLocale(), {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -28,10 +34,10 @@ export function formatDate(value: string | null): string {
 
 export function formatDateTime(value: string | null): string {
   if (!value) {
-    return "Not set";
+    return getStoredLanguage() === "zh" ? "未设置" : "Not set";
   }
 
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat(resolveLocale(), {
     year: "numeric",
     month: "short",
     day: "numeric",

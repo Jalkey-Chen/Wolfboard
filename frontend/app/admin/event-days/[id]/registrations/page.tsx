@@ -11,9 +11,11 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 
+import { useI18n } from "@/components/language-provider";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { formatDate } from "@/lib/date";
+import { getMetaLabelClass } from "@/lib/i18n";
 import {
   getEventDay,
   getEventDayRegistrations,
@@ -35,6 +37,7 @@ const registrationTypes: RegistrationType[] = ["main", "substitute", "guest"];
 export default function AdminEventDayRegistrationsPage() {
   const params = useParams<{ id: string }>();
   const eventDayId = Number(params.id);
+  const { t, enumLabel, language } = useI18n();
   const { token, profile, isLoading } = useAuthenticatedSession({ requiredRole: "admin" });
   const [eventDay, setEventDay] = useState<EventDayDetail | null>(null);
   const [registrations, setRegistrations] = useState<RegistrationRecord[]>([]);
@@ -59,12 +62,12 @@ export default function AdminEventDayRegistrationsPage() {
           Object.fromEntries(registrationResponse.map((registration) => [registration.id, registration])),
         );
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to load registrations.");
+        setErrorMessage(error instanceof Error ? error.message : t("common.failedToLoad"));
       }
     }
 
     void loadPage();
-  }, [eventDayId, profile, token]);
+  }, [eventDayId, profile, t, token]);
 
   const rows = useMemo(
     () => registrations.map((registration) => drafts[registration.id] ?? registration),
@@ -72,12 +75,14 @@ export default function AdminEventDayRegistrationsPage() {
   );
 
   if (isLoading) {
-    return <PageLoading message="Loading admin registration management..." />;
+    return <PageLoading message={`${t("admin.registrations.title")}...`} />;
   }
 
   if (!profile || Number.isNaN(eventDayId)) {
     return null;
   }
+
+  const metaLabelClass = getMetaLabelClass(language);
 
   async function refreshRegistrations() {
     if (!token) {
@@ -115,7 +120,7 @@ export default function AdminEventDayRegistrationsPage() {
       const updatedEventDay = await getEventDay(token, eventDayId);
       setEventDay(updatedEventDay);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to update the registration.");
+      setErrorMessage(error instanceof Error ? error.message : t("common.failedToLoad"));
     } finally {
       setSavingId(null);
     }
@@ -124,16 +129,16 @@ export default function AdminEventDayRegistrationsPage() {
   return (
     <SiteShell
       profile={profile}
-      title={eventDay ? `${eventDay.title} · Registrations` : "Registrations"}
-      description="Admin-only registration and check-in management for a single event day."
+      title={eventDay ? `${eventDay.title} · ${t("admin.registrations.title")}` : t("admin.registrations.title")}
+      description={t("admin.registrations.title")}
       actions={
         eventDay ? (
           <div className="flex flex-wrap gap-3">
             <Link className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200" href={`/admin/event-days/${eventDay.id}`}>
-              Edit Event Day
+              {t("eventDay.edit")}
             </Link>
             <Link className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800" href={`/event-days/${eventDay.id}`}>
-              Public View
+              {t("common.view")}
             </Link>
           </div>
         ) : null
@@ -146,15 +151,15 @@ export default function AdminEventDayRegistrationsPage() {
           <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
             <div className="grid gap-4 md:grid-cols-3">
               <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Date</div>
+                <div className={metaLabelClass}>{t("common.date")}</div>
                 <div className="mt-2 text-sm text-slate-700">{formatDate(eventDay.event_date)}</div>
               </div>
               <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Venue</div>
+                <div className={metaLabelClass}>{t("common.venue")}</div>
                 <div className="mt-2 text-sm text-slate-700">{eventDay.venue}</div>
               </div>
               <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Registration Count</div>
+                <div className={metaLabelClass}>{t("eventDay.registeredPlayers")}</div>
                 <div className="mt-2 text-sm text-slate-700">{eventDay.registration_count}</div>
               </div>
             </div>
@@ -162,17 +167,17 @@ export default function AdminEventDayRegistrationsPage() {
         ) : null}
 
         <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
-          <h2 className="text-2xl font-bold text-ink">Registration List</h2>
+          <h2 className="text-2xl font-bold text-ink">{t("admin.registrations.title")}</h2>
           <div className="mt-5 overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead>
                 <tr className="text-left text-slate-500">
-                  <th className="px-3 py-3 font-semibold">Player</th>
-                  <th className="px-3 py-3 font-semibold">Registration</th>
-                  <th className="px-3 py-3 font-semibold">Check-in</th>
-                  <th className="px-3 py-3 font-semibold">Type</th>
-                  <th className="px-3 py-3 font-semibold">Note</th>
-                  <th className="px-3 py-3 font-semibold">Action</th>
+                  <th className="px-3 py-3 font-semibold">{t("common.player")}</th>
+                  <th className="px-3 py-3 font-semibold">{t("eventDay.registrationStatus")}</th>
+                  <th className="px-3 py-3 font-semibold">{t("eventDay.checkInStatus")}</th>
+                  <th className="px-3 py-3 font-semibold">{t("eventDay.registrationType")}</th>
+                  <th className="px-3 py-3 font-semibold">{t("common.note")}</th>
+                  <th className="px-3 py-3 font-semibold">{t("common.actions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -198,7 +203,7 @@ export default function AdminEventDayRegistrationsPage() {
                       >
                         {registrationStatuses.map((status) => (
                           <option key={status} value={status}>
-                            {status}
+                            {enumLabel("registrationStatus", status)}
                           </option>
                         ))}
                       </select>
@@ -219,7 +224,7 @@ export default function AdminEventDayRegistrationsPage() {
                       >
                         {checkInStatuses.map((status) => (
                           <option key={status} value={status}>
-                            {status}
+                            {enumLabel("checkInStatus", status)}
                           </option>
                         ))}
                       </select>
@@ -240,7 +245,7 @@ export default function AdminEventDayRegistrationsPage() {
                       >
                         {registrationTypes.map((type) => (
                           <option key={type} value={type}>
-                            {type}
+                            {enumLabel("registrationType", type)}
                           </option>
                         ))}
                       </select>
@@ -267,7 +272,7 @@ export default function AdminEventDayRegistrationsPage() {
                         onClick={() => void handleSave(registration.id)}
                         type="button"
                       >
-                        {savingId === registration.id ? "Saving..." : "Save"}
+                        {savingId === registration.id ? t("resultEntry.saving") : t("common.save")}
                       </button>
                     </td>
                   </tr>

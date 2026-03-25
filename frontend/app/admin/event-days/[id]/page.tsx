@@ -11,9 +11,11 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
+import { useI18n } from "@/components/language-provider";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { formatDateTime, toDateTimeLocalValue } from "@/lib/date";
+import { getMetaLabelClass } from "@/lib/i18n";
 import {
   getEventDay,
   updateEventDay,
@@ -38,6 +40,7 @@ const eventDayStatuses: EventDayStatus[] = [
 export default function AdminEventDayPage() {
   const params = useParams<{ id: string }>();
   const eventDayId = Number(params.id);
+  const { t, enumLabel, language } = useI18n();
   const { token, profile, isLoading } = useAuthenticatedSession({ requiredRole: "admin" });
   const [eventDay, setEventDay] = useState<EventDayDetail | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -73,17 +76,19 @@ export default function AdminEventDayPage() {
         });
       })
       .catch((error) => {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to load the event day.");
+        setErrorMessage(error instanceof Error ? error.message : t("eventDay.loadError"));
       });
-  }, [eventDayId, profile, token]);
+  }, [eventDayId, profile, t, token]);
 
   if (isLoading) {
-    return <PageLoading message="Loading admin event-day management..." />;
+    return <PageLoading message={`${t("admin.eventDay.title")}...`} />;
   }
 
   if (!profile || Number.isNaN(eventDayId)) {
     return null;
   }
+
+  const metaLabelClass = getMetaLabelClass(language);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -107,7 +112,7 @@ export default function AdminEventDayPage() {
       });
       setEventDay(updatedEventDay);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to update the event day.");
+      setErrorMessage(error instanceof Error ? error.message : t("common.failedToLoad"));
     } finally {
       setIsSaving(false);
     }
@@ -116,19 +121,19 @@ export default function AdminEventDayPage() {
   return (
     <SiteShell
       profile={profile}
-      title={eventDay?.title ?? "Manage Event Day"}
-      description="Edit event-day information and open the registration management surface."
+      title={eventDay?.title ?? t("admin.eventDay.title")}
+      description={t("admin.eventDay.title")}
       actions={
         eventDay ? (
           <div className="flex flex-wrap gap-3">
             <Link className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200" href={`/event-days/${eventDay.id}`}>
-              Public View
+              {t("common.view")}
             </Link>
             <Link className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800" href={`/admin/event-days/${eventDay.id}/registrations`}>
-              Manage Registrations
+              {t("eventDay.manageRegistrations")}
             </Link>
             <Link className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200" href={`/admin/event-days/${eventDay.id}/games`}>
-              Manage Games
+              {t("eventDay.manageGames")}
             </Link>
           </div>
         ) : null
@@ -136,7 +141,7 @@ export default function AdminEventDayPage() {
     >
       <div className="grid gap-5 xl:grid-cols-[1fr_0.8fr]">
         <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
-          <h2 className="text-2xl font-bold text-ink">Edit Event Day</h2>
+          <h2 className="text-2xl font-bold text-ink">{t("eventDay.edit")}</h2>
           {errorMessage ? <div className="mt-4"><PageError message={errorMessage} /></div> : null}
           <form className="mt-5 grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
             <input
@@ -165,7 +170,7 @@ export default function AdminEventDayPage() {
             >
               {eventDayCategories.map((category) => (
                 <option key={category} value={category}>
-                  {category}
+                  {enumLabel("eventDayCategory", category)}
                 </option>
               ))}
             </select>
@@ -176,7 +181,7 @@ export default function AdminEventDayPage() {
             >
               {eventDayStatuses.map((status) => (
                 <option key={status} value={status}>
-                  {status}
+                  {enumLabel("eventDayStatus", status)}
                 </option>
               ))}
             </select>
@@ -200,10 +205,10 @@ export default function AdminEventDayPage() {
             <div className="md:col-span-2">
               <button
                 className="rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:bg-slate-400"
-                disabled={isSaving}
-                type="submit"
-              >
-                {isSaving ? "Saving..." : "Save Event Day"}
+              disabled={isSaving}
+              type="submit"
+            >
+                {isSaving ? t("resultEntry.saving") : t("common.save")}
               </button>
             </div>
           </form>
@@ -211,20 +216,23 @@ export default function AdminEventDayPage() {
 
         {eventDay ? (
           <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
-            <h2 className="text-2xl font-bold text-ink">Event Snapshot</h2>
+            <h2 className="text-2xl font-bold text-ink">{t("common.preview")}</h2>
             <div className="mt-5 space-y-4 text-sm text-slate-700">
               <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Current Registration Window</div>
+                <div className={metaLabelClass}>{t("common.registrationWindow")}</div>
                 <div className="mt-2">
-                  {formatDateTime(eventDay.registration_open_at)} to {formatDateTime(eventDay.registration_close_at)}
+                  {t("common.windowRange", {
+                    start: formatDateTime(eventDay.registration_open_at),
+                    end: formatDateTime(eventDay.registration_close_at),
+                  })}
                 </div>
               </div>
               <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Current Registration Count</div>
+                <div className={metaLabelClass}>{t("eventDay.registeredPlayers")}</div>
                 <div className="mt-2">{eventDay.registration_count}</div>
               </div>
               <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Current Game Count</div>
+                <div className={metaLabelClass}>{t("eventDay.games")}</div>
                 <div className="mt-2">{eventDay.game_count}</div>
               </div>
             </div>

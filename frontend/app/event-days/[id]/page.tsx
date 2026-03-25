@@ -11,9 +11,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
+import { useI18n } from "@/components/language-provider";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { formatDate, formatDateTime } from "@/lib/date";
+import { getMetaLabelClass } from "@/lib/i18n";
 import { cancelRegistration, getEventDay, registerForEventDay, type EventDayDetail } from "@/lib/api";
 import { useAuthenticatedSession } from "@/lib/use-authenticated-session";
 
@@ -21,6 +23,7 @@ import { useAuthenticatedSession } from "@/lib/use-authenticated-session";
 export default function EventDayDetailPage() {
   const params = useParams<{ id: string }>();
   const eventDayId = Number(params.id);
+  const { t, enumLabel, language } = useI18n();
   const { token, profile, isLoading, hasRole } = useAuthenticatedSession();
   const [eventDay, setEventDay] = useState<EventDayDetail | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -36,12 +39,12 @@ export default function EventDayDetailPage() {
         setEventDay(response);
       })
       .catch((error) => {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to load the event day.");
+        setErrorMessage(error instanceof Error ? error.message : t("eventDay.loadError"));
       });
-  }, [eventDayId, profile, token]);
+  }, [eventDayId, profile, t, token]);
 
   if (isLoading) {
-    return <PageLoading message="Loading event day..." />;
+    return <PageLoading message={t("eventDay.loading")} />;
   }
 
   if (!profile || Number.isNaN(eventDayId)) {
@@ -69,7 +72,7 @@ export default function EventDayDetailPage() {
       await registerForEventDay(token, eventDayId, {});
       await refreshEventDay();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to register for the event day.");
+      setErrorMessage(error instanceof Error ? error.message : t("eventDay.registerError"));
     } finally {
       setIsSubmitting(false);
     }
@@ -87,7 +90,7 @@ export default function EventDayDetailPage() {
       await cancelRegistration(token, eventDay.viewer_registration.id);
       await refreshEventDay();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to cancel the registration.");
+      setErrorMessage(error instanceof Error ? error.message : t("eventDay.cancelError"));
     } finally {
       setIsSubmitting(false);
     }
@@ -102,20 +105,21 @@ export default function EventDayDetailPage() {
     eventDay?.status === "open_for_registration" &&
     eventDay.viewer_registration !== null &&
     eventDay.viewer_registration.registration_status !== "cancelled";
+  const metaLabelClass = getMetaLabelClass(language);
 
   return (
     <SiteShell
       profile={profile}
-      title={eventDay?.title ?? "Event Day"}
-      description={`Season: ${eventDay?.season_name ?? "Loading..."}`}
+      title={eventDay?.title ?? t("eventDay.title")}
+      description={t("eventDay.description", { season: eventDay?.season_name ?? t("common.loading") })}
       actions={
         hasRole("admin") && eventDay ? (
           <div className="flex flex-wrap gap-3">
             <Link className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200" href={`/admin/event-days/${eventDay.id}`}>
-              Edit Event Day
+              {t("eventDay.edit")}
             </Link>
             <Link className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800" href={`/admin/event-days/${eventDay.id}/registrations`}>
-              Manage Registrations
+              {t("eventDay.manageRegistrations")}
             </Link>
           </div>
         ) : null
@@ -129,62 +133,65 @@ export default function EventDayDetailPage() {
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Date</div>
+                  <div className={metaLabelClass}>{t("common.date")}</div>
                   <div className="mt-2 text-sm text-slate-700">{formatDate(eventDay.event_date)}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Venue</div>
+                  <div className={metaLabelClass}>{t("common.venue")}</div>
                   <div className="mt-2 text-sm text-slate-700">{eventDay.venue}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Category</div>
-                  <div className="mt-2 text-sm text-slate-700">{eventDay.category}</div>
+                  <div className={metaLabelClass}>{t("common.category")}</div>
+                  <div className="mt-2 text-sm text-slate-700">{enumLabel("eventDayCategory", eventDay.category)}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Status</div>
-                  <div className="mt-2 text-sm text-slate-700">{eventDay.status}</div>
+                  <div className={metaLabelClass}>{t("common.status")}</div>
+                  <div className="mt-2 text-sm text-slate-700">{enumLabel("eventDayStatus", eventDay.status)}</div>
                 </div>
               </div>
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Registration Window</div>
+                  <div className={metaLabelClass}>{t("common.registrationWindow")}</div>
                   <div className="mt-2 text-sm text-slate-700">
-                    {formatDateTime(eventDay.registration_open_at)} to {formatDateTime(eventDay.registration_close_at)}
+                    {t("common.windowRange", {
+                      start: formatDateTime(eventDay.registration_open_at),
+                      end: formatDateTime(eventDay.registration_close_at),
+                    })}
                   </div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Registered Players</div>
+                  <div className={metaLabelClass}>{t("eventDay.registeredPlayers")}</div>
                   <div className="mt-2 text-sm text-slate-700">{eventDay.registration_count}</div>
                 </div>
               </div>
               <div className="mt-5 rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-700">
-                {eventDay.notes ?? "No notes provided."}
+                {eventDay.notes ?? t("common.noNotes")}
               </div>
             </section>
 
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
-              <h2 className="text-2xl font-bold text-ink">My Registration</h2>
+              <h2 className="text-2xl font-bold text-ink">{t("eventDay.myRegistration")}</h2>
               {eventDay.viewer_registration ? (
                 <div className="mt-5 grid gap-4 md:grid-cols-2">
                   <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                    <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Registration Status</div>
-                    <div className="mt-2 text-sm text-slate-700">{eventDay.viewer_registration.registration_status}</div>
+                    <div className={metaLabelClass}>{t("eventDay.registrationStatus")}</div>
+                    <div className="mt-2 text-sm text-slate-700">{enumLabel("registrationStatus", eventDay.viewer_registration.registration_status)}</div>
                   </div>
                   <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                    <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Check-in Status</div>
-                    <div className="mt-2 text-sm text-slate-700">{eventDay.viewer_registration.check_in_status}</div>
+                    <div className={metaLabelClass}>{t("eventDay.checkInStatus")}</div>
+                    <div className="mt-2 text-sm text-slate-700">{enumLabel("checkInStatus", eventDay.viewer_registration.check_in_status)}</div>
                   </div>
                   <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                    <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Registration Type</div>
-                    <div className="mt-2 text-sm text-slate-700">{eventDay.viewer_registration.registration_type}</div>
+                    <div className={metaLabelClass}>{t("eventDay.registrationType")}</div>
+                    <div className="mt-2 text-sm text-slate-700">{enumLabel("registrationType", eventDay.viewer_registration.registration_type)}</div>
                   </div>
                   <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                    <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Note</div>
-                    <div className="mt-2 text-sm text-slate-700">{eventDay.viewer_registration.note ?? "No note."}</div>
+                    <div className={metaLabelClass}>{t("eventDay.note")}</div>
+                    <div className="mt-2 text-sm text-slate-700">{eventDay.viewer_registration.note ?? t("common.none")}</div>
                   </div>
                 </div>
               ) : (
-                <p className="mt-4 text-sm text-slate-600">You have not registered for this event day yet.</p>
+                <p className="mt-4 text-sm text-slate-600">{t("eventDay.notRegistered")}</p>
               )}
 
               <div className="mt-5 flex flex-wrap gap-3">
@@ -195,7 +202,7 @@ export default function EventDayDetailPage() {
                     onClick={handleRegister}
                     type="button"
                   >
-                    {isSubmitting ? "Registering..." : "Register"}
+                    {isSubmitting ? t("eventDay.registering") : t("eventDay.register")}
                   </button>
                 ) : null}
                 {canCancel ? (
@@ -205,7 +212,7 @@ export default function EventDayDetailPage() {
                     onClick={handleCancelRegistration}
                     type="button"
                   >
-                    {isSubmitting ? "Cancelling..." : "Cancel Registration"}
+                    {isSubmitting ? t("eventDay.cancelling") : t("eventDay.cancelRegistration")}
                   </button>
                 ) : null}
               </div>
@@ -213,13 +220,13 @@ export default function EventDayDetailPage() {
 
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-2xl font-bold text-ink">Games</h2>
+                <h2 className="text-2xl font-bold text-ink">{t("eventDay.games")}</h2>
                 {hasRole("admin") ? (
                   <Link
                     className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
                     href={`/admin/event-days/${eventDay.id}/games`}
                   >
-                    Manage Games
+                    {t("eventDay.manageGames")}
                   </Link>
                 ) : null}
               </div>
@@ -234,14 +241,14 @@ export default function EventDayDetailPage() {
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                       <div>
                         <h3 className="text-xl font-semibold text-ink">
-                          Table {game.table_number} · Game {game.game_number}
+                          {game.table_number}桌 · 第{game.game_number}局
                         </h3>
                         <p className="mt-2 text-sm text-slate-600">
-                          {game.format_name} · Judge: {game.judge_display_name}
+                          {game.format_name} · {enumLabel("role", "judge")}: {game.judge_display_name}
                         </p>
                       </div>
                       <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
-                        {game.game_type} · {game.status}
+                        {enumLabel("gameType", game.game_type)} · {enumLabel("gameStatus", game.status)}
                       </div>
                     </div>
                   </Link>
@@ -249,7 +256,7 @@ export default function EventDayDetailPage() {
 
                 {eventDay.games.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-6 text-sm text-slate-600">
-                    No games have been created for this event day yet.
+                    {t("eventDay.noGames")}
                   </div>
                 ) : null}
               </div>
