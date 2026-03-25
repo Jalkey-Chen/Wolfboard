@@ -1,9 +1,9 @@
 /**
  * Typed frontend API client for the current Wolfboard MVP surface.
  *
- * Milestone 3 expands the client with preset-format browsing, admin game
- * management, and judge-owned game queues while preserving all Milestone 1 and
- * Milestone 2 auth, season, and registration flows.
+ * Milestone 4 expands the client with result-draft reads, saves, and final
+ * submission while preserving the earlier auth, season, registration, format,
+ * and game-management flows.
  */
 export type RoleKey = "admin" | "judge" | "player";
 export type SeasonStatus = "draft" | "active" | "completed" | "archived";
@@ -347,6 +347,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     let message = "Request failed.";
     let detail: unknown = null;
     try {
+      // Result-entry validation returns structured details, so callers keep the
+      // original payload for field-level feedback instead of flattening it.
       const body = (await response.json()) as { detail?: unknown; message?: string };
       detail = body.detail ?? body;
       if (typeof body.detail === "string") {

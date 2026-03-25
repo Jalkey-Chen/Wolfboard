@@ -27,6 +27,9 @@ def validate_game_result_payload(
 
     Draft saves are lenient enough to support partial work. Submission mode
     upgrades missing required fields into blocking errors.
+
+    Non-blocking warnings are still returned so the UI can flag player-count
+    mismatches and unexpected role names without preventing draft saves.
     """
 
     errors: list[ValidationMessage] = []

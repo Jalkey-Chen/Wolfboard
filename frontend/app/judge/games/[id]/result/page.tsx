@@ -160,6 +160,8 @@ export default function JudgeGameResultPage() {
     if (!draft) {
       return { errors: [], warnings: [] };
     }
+    // The client preview mirrors the current backend rules for fast feedback
+    // while editing, but persisted scores always come from the server.
     return buildDraftValidation({
       players: playerRows,
       adjustments: adjustmentRows,
@@ -170,6 +172,8 @@ export default function JudgeGameResultPage() {
   }, [adjustmentRows, draft, playerRows]);
 
   const previewByRowId = useMemo(() => {
+    // Preview scores stay keyed by the local row id so unsaved rows can still
+    // render stable totals before the backend assigns database ids.
     const adjustmentTotals = buildAdjustmentTotals(adjustmentRows);
     return Object.fromEntries(
       playerRows.map((player) => {
@@ -202,6 +206,8 @@ export default function JudgeGameResultPage() {
       return null;
     }
 
+    // The browser always sends the full editable snapshot. The backend then
+    // replaces the current draft in one pass and recalculates all score fields.
     resetValidationFeedback();
     try {
       const response = await saveGameResultDraft(token, gameId, {
@@ -251,6 +257,8 @@ export default function JudgeGameResultPage() {
 
     setIsSubmitting(true);
     try {
+      // Submitting first saves the visible draft so the final validation runs
+      // against the exact data the judge sees in the current browser state.
       const savedDraft = await persistDraft();
       if (!savedDraft) {
         return;

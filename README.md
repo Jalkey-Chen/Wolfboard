@@ -1,10 +1,10 @@
 # Wolfboard
 
-Wolfboard is a web-based Werewolf tournament recording platform. This repository currently contains **Milestone 3: preset formats, event-day game management, judge assignment, and judge-owned game browsing** on top of the Milestone 1 and Milestone 2 foundations.
+Wolfboard is a web-based Werewolf tournament recording platform. This repository currently contains **Milestone 4: judge-owned result entry, draft persistence, score preview, and result submission** on top of the Milestone 1 through Milestone 3 foundations.
 
 ## Scope
 
-Milestone 3 includes:
+Milestone 4 includes:
 
 - Monorepo structure with `frontend/` and `backend/`
 - FastAPI backend with PostgreSQL connectivity
@@ -18,7 +18,9 @@ Milestone 3 includes:
   - `game_formats`
   - `format_roles`
   - `games`
-- Alembic migrations through Milestone 3
+  - `game_players`
+  - `score_adjustments`
+- Alembic migrations through Milestone 4
 - JWT authentication with multi-role responses
 - FastAPI role dependencies for future resource-level authorization
 - Next.js App Router frontend with:
@@ -29,18 +31,18 @@ Milestone 3 includes:
   - preset format list and detail pages
   - game detail page
   - judge-owned games page
+  - judge-owned result entry page
   - admin season management page
   - admin event-day management page
   - admin registration and check-in page
   - admin game management page
 - Docker Compose for local startup
-- Seed script with sample users, season data, event days, registrations, preset formats, and sample games
+- Seed script with sample users, season data, event days, registrations, preset formats, sample games, and result-entry-ready player pools
 
-Milestone 3 does **not** include:
+Milestone 4 does **not** include:
 
-- `game_players`
-- result entry
-- scoring or score logs
+- result confirmation
+- score logs
 - leaderboard logic
 - event-flow recording
 
@@ -218,6 +220,15 @@ Seeded sample games include:
 
 The sample games intentionally assign at least one game to `judge_user` and at least one game to `admin_user`.
 
+### Result-entry player pool
+
+The open registration event day also seeds:
+
+- `player_user`
+- `sample_player_01` through `sample_player_10`
+
+This gives the assigned judge enough selectable players to save and submit a realistic result draft during local testing.
+
 ## Authentication Flow
 
 ### `POST /api/v1/auth/login`
@@ -260,9 +271,9 @@ Authorization: Bearer <access_token>
 
 Returns the authenticated user profile and all assigned system roles.
 
-## Milestone 3 API Summary
+## Milestone 4 API Summary
 
-Existing Milestone 1 and 2 routes remain available. Milestone 3 adds:
+Existing Milestone 1 to 3 routes remain available. Milestone 4 adds:
 
 - `GET /api/v1/formats`
 - `GET /api/v1/formats/{format_id}`
@@ -273,6 +284,9 @@ Existing Milestone 1 and 2 routes remain available. Milestone 3 adds:
 - `PATCH /api/v1/games/{game_id}`
 - `GET /api/v1/judges/me/games`
 - `GET /api/v1/users/judges`
+- `GET /api/v1/games/{game_id}/result-draft`
+- `PUT /api/v1/games/{game_id}/result-draft`
+- `POST /api/v1/games/{game_id}/submit-result`
 
 ## Validation Steps
 
@@ -311,6 +325,36 @@ Existing Milestone 1 and 2 routes remain available. Milestone 3 adds:
 5. Confirm the page is accessible.
 6. Try to mutate a game through an admin-only API such as `PATCH /api/v1/games/{id}` and confirm the backend returns `403`.
 
+### Judge result-entry flow
+
+1. Sign in with `judge_user / password123`.
+2. Open `http://localhost:3000/judge/games`.
+3. Open a judge-owned game whose status is `draft` or `in_progress`.
+4. Click `Enter Result`.
+5. Add player rows with seat number, player, role, faction, winner flag, final status, and remarks.
+6. Add at least one score adjustment.
+7. Click `Save Draft`.
+8. Refresh the page and confirm the draft still exists.
+9. Click `Submit Result`.
+10. Confirm the page becomes read-only and the game status is now `submitted`.
+
+### Submitted read-only verification
+
+1. Refresh the same result-entry page after submission.
+2. Confirm all inputs are read-only.
+3. Confirm `Save Draft` and `Submit Result` are no longer available.
+4. Open the game detail page and confirm the result summary is visible.
+
+### Ownership and permission verification
+
+1. Sign in with `player_user / password123`.
+2. Try to open `http://localhost:3000/judge/games/1/result`.
+3. Confirm the frontend redirects away from the page.
+4. Call `GET /api/v1/games/{id}/result-draft` as `player_user`.
+5. Confirm the backend returns `403`.
+6. As `judge_user`, try to call `PUT /api/v1/games/{id}/result-draft` after the same game has been submitted.
+7. Confirm the backend rejects the update.
+
 ### Backend verification flow
 
 1. Open `http://localhost:8000/docs`.
@@ -318,6 +362,8 @@ Existing Milestone 1 and 2 routes remain available. Milestone 3 adds:
 3. Call `GET /api/v1/formats` and confirm the seeded presets are returned.
 4. Call `GET /api/v1/event-days/1` and confirm the response includes a `games` array.
 5. Call `GET /api/v1/judges/me/games` as `judge_user` and confirm only assigned games are returned.
+6. Call `GET /api/v1/games/{id}/result-draft` as the assigned judge and confirm the payload includes `players`, `adjustments`, `format_roles`, `selectable_players`, and `validation`.
+7. Call `POST /api/v1/games/{id}/submit-result` after saving a valid draft and confirm the returned status is `submitted`.
 
 ## Notes
 
@@ -325,5 +371,6 @@ Existing Milestone 1 and 2 routes remain available. Milestone 3 adds:
 - Authorization is based on `users`, `roles`, and `user_roles`; there is no single `users.role_id`.
 - Role checks are centralized in FastAPI dependencies so later milestones can layer in resource-level ownership rules.
 - Admins manage seasons, event days, registrations, check-in state, formats, and games.
-- Judges can only access the game queue that belongs to them.
-- Result-entry, player-per-game data, score logs, and event flow are intentionally deferred to later milestones.
+- Judges can only access the game queue and result-entry routes that belong to them.
+- Result drafts always recompute base score, adjustment score, and final score on the backend.
+- Result confirmation, formal score logs, leaderboards, and event flow are intentionally deferred to later milestones.

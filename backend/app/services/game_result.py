@@ -208,6 +208,8 @@ def save_game_result_draft(db: Session, game: Game, payload: GameResultDraftWrit
             },
         )
 
+    # The draft endpoint follows a full-replacement model so the frontend does
+    # not need row-level patch semantics while judges are editing at the table.
     db.execute(delete(ScoreAdjustment).where(ScoreAdjustment.game_player_id.in_(select(GamePlayer.id).where(GamePlayer.game_id == game.id))))
     db.execute(delete(GamePlayer).where(GamePlayer.game_id == game.id))
     db.flush()
@@ -239,6 +241,8 @@ def save_game_result_draft(db: Session, game: Game, payload: GameResultDraftWrit
     deltas_by_player_id: dict[int, list[float]] = defaultdict(list)
 
     for adjustment_input in payload.adjustments:
+        # Adjustments are currently targeted by seat number because seat numbers
+        # are stable in the judge workflow even before rows have persistent ids.
         target_player = players_by_seat[adjustment_input.target_seat_number]
         adjustment = ScoreAdjustment(
             game_player_id=target_player.id,
