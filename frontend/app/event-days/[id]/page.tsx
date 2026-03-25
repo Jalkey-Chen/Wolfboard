@@ -210,6 +210,50 @@ export default function EventDayDetailPage() {
                 ) : null}
               </div>
             </section>
+
+            <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-2xl font-bold text-ink">Games</h2>
+                {hasRole("admin") ? (
+                  <Link
+                    className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                    href={`/admin/event-days/${eventDay.id}/games`}
+                  >
+                    Manage Games
+                  </Link>
+                ) : null}
+              </div>
+
+              <div className="mt-5 grid gap-4">
+                {eventDay.games.map((game) => (
+                  <Link
+                    key={game.id}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 p-5 transition hover:border-slate-300 hover:bg-white"
+                    href={`/games/${game.id}`}
+                  >
+                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <h3 className="text-xl font-semibold text-ink">
+                          Table {game.table_number} · Game {game.game_number}
+                        </h3>
+                        <p className="mt-2 text-sm text-slate-600">
+                          {game.format_name} · Judge: {game.judge_display_name}
+                        </p>
+                      </div>
+                      <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
+                        {game.game_type} · {game.status}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+
+                {eventDay.games.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-6 text-sm text-slate-600">
+                    No games have been created for this event day yet.
+                  </div>
+                ) : null}
+              </div>
+            </section>
           </>
         ) : null}
       </div>

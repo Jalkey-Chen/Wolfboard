@@ -8,6 +8,7 @@ from app.core.dependencies import get_current_user, require_role
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.game import GameCreate, GameDetail, GameSummary, JudgeOptionRead, GameUpdate
+from app.services.event_day import get_event_day_or_404
 from app.services.game import create_game, get_game_or_404, list_games_for_event_day, list_games_for_judge, update_game
 from app.services.user_directory import list_judge_capable_users
 
@@ -47,6 +48,7 @@ def read_event_day_games(
     """Return all games attached to an event day for authenticated users."""
 
     _ = current_user
+    _ = get_event_day_or_404(db, event_day_id)
     games = list_games_for_event_day(db, event_day_id)
     return [GameSummary.model_validate(game) for game in games]
 

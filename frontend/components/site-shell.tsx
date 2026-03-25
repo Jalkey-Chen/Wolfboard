@@ -29,6 +29,8 @@ export function SiteShell({
   children,
 }: SiteShellProps) {
   const isAdmin = profile.roles.includes("admin");
+  const isJudge = profile.roles.includes("judge");
+  const canOpenJudgeQueue = isAdmin || isJudge;
 
   return (
     <main className="min-h-screen px-6 py-8">
@@ -58,6 +60,14 @@ export function SiteShell({
                 <Link className="rounded-full bg-slate-100 px-4 py-2 hover:bg-slate-200" href="/seasons">
                   Seasons
                 </Link>
+                <Link className="rounded-full bg-slate-100 px-4 py-2 hover:bg-slate-200" href="/formats">
+                  Formats
+                </Link>
+                {canOpenJudgeQueue ? (
+                  <Link className="rounded-full bg-slate-100 px-4 py-2 hover:bg-slate-200" href="/judge/games">
+                    Judge Games
+                  </Link>
+                ) : null}
                 {isAdmin ? (
                   <Link className="rounded-full bg-slate-100 px-4 py-2 hover:bg-slate-200" href="/admin/seasons">
                     Admin Seasons
