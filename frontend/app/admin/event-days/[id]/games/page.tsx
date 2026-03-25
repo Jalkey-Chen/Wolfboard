@@ -11,6 +11,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 
+import { useI18n } from "@/components/language-provider";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { formatDate, toDateTimeLocalValue } from "@/lib/date";
@@ -89,6 +90,7 @@ function buildFormState(game: GameSummary | null): FormState {
 export default function AdminEventDayGamesPage() {
   const params = useParams<{ id: string }>();
   const eventDayId = Number(params.id);
+  const { t, enumLabel } = useI18n();
   const { token, profile, isLoading } = useAuthenticatedSession({ requiredRole: "admin" });
   const [eventDay, setEventDay] = useState<EventDayDetail | null>(null);
   const [formats, setFormats] = useState<GameFormatRecord[]>([]);
@@ -114,12 +116,12 @@ export default function AdminEventDayGamesPage() {
         setFormats(formatResponse);
         setJudges(judgeResponse);
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to load game management data.");
+        setErrorMessage(error instanceof Error ? error.message : t("common.failedToLoad"));
       }
     }
 
     void loadPage();
-  }, [eventDayId, profile, token]);
+  }, [eventDayId, profile, t, token]);
 
   const selectedGame = useMemo(
     () => eventDay?.games.find((game) => game.id === selectedGameId) ?? null,
@@ -127,7 +129,7 @@ export default function AdminEventDayGamesPage() {
   );
 
   if (isLoading) {
-    return <PageLoading message="Loading event-day games..." />;
+    return <PageLoading message={`${t("admin.games.title")}...`} />;
   }
 
   if (!profile || Number.isNaN(eventDayId)) {
@@ -187,7 +189,7 @@ export default function AdminEventDayGamesPage() {
       setSelectedGameId(null);
       setFormState(emptyFormState());
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to save the game.");
+      setErrorMessage(error instanceof Error ? error.message : t("common.failedToLoad"));
     } finally {
       setIsSaving(false);
     }
@@ -196,8 +198,8 @@ export default function AdminEventDayGamesPage() {
   return (
     <SiteShell
       profile={profile}
-      title={eventDay ? `${eventDay.title} · Games` : "Manage Games"}
-      description="Create and edit scheduled games under a single event day."
+      title={eventDay ? `${eventDay.title} · ${t("admin.games.title")}` : t("admin.games.title")}
+      description={t("admin.games.title")}
       actions={
         eventDay ? (
           <div className="flex flex-wrap gap-3">
@@ -205,13 +207,13 @@ export default function AdminEventDayGamesPage() {
               className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
               href={`/event-days/${eventDay.id}`}
             >
-              Public View
+              {t("common.view")}
             </Link>
             <Link
               className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
               href={`/admin/event-days/${eventDay.id}`}
             >
-              Edit Event Day
+              {t("eventDay.edit")}
             </Link>
           </div>
         ) : null
@@ -220,7 +222,7 @@ export default function AdminEventDayGamesPage() {
       <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
         <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-2xl font-bold text-ink">Scheduled Games</h2>
+            <h2 className="text-2xl font-bold text-ink">{t("eventDay.games")}</h2>
             <button
               className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
               onClick={() => {
@@ -229,13 +231,13 @@ export default function AdminEventDayGamesPage() {
               }}
               type="button"
             >
-              Create New
+              {t("common.create")}
             </button>
           </div>
 
           {eventDay ? (
             <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-700">
-              {formatDate(eventDay.event_date)} · {eventDay.venue} · {eventDay.game_count} games
+              {formatDate(eventDay.event_date)} · {eventDay.venue} · {eventDay.game_count} {t("eventDay.games")}
             </div>
           ) : null}
 
@@ -247,13 +249,13 @@ export default function AdminEventDayGamesPage() {
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
                     <h3 className="text-xl font-semibold text-ink">
-                      Table {game.table_number} · Game {game.game_number}
+                      {game.table_number}桌 · 第{game.game_number}局
                     </h3>
                     <p className="mt-2 text-sm text-slate-600">
-                      {game.format_name} · Judge: {game.judge_display_name}
+                      {game.format_name} · {t("common.judge")}: {game.judge_display_name}
                     </p>
                     <p className="mt-2 text-sm text-slate-600">
-                      Type: {game.game_type} · Status: {game.status}
+                      {t("common.type")}: {enumLabel("gameType", game.game_type)} · {t("common.status")}: {enumLabel("gameStatus", game.status)}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-3">
@@ -261,7 +263,7 @@ export default function AdminEventDayGamesPage() {
                       className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
                       href={`/games/${game.id}`}
                     >
-                      View
+                      {t("common.view")}
                     </Link>
                     <button
                       className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
@@ -271,7 +273,7 @@ export default function AdminEventDayGamesPage() {
                       }}
                       type="button"
                     >
-                      Edit
+                      {t("common.edit")}
                     </button>
                   </div>
                 </div>
@@ -280,21 +282,21 @@ export default function AdminEventDayGamesPage() {
 
             {eventDay && eventDay.games.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-6 text-sm text-slate-600">
-                No games are scheduled for this event day yet.
+                {t("eventDay.noGames")}
               </div>
             ) : null}
           </div>
         </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
-          <h2 className="text-2xl font-bold text-ink">{selectedGame ? "Edit Game" : "Create Game"}</h2>
+          <h2 className="text-2xl font-bold text-ink">{selectedGame ? t("admin.editGame") : t("admin.createGame")}</h2>
 
           <form className="mt-5 grid gap-4" onSubmit={handleSubmit}>
             <input
               className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
               min={1}
               onChange={(event) => setFormState((current) => ({ ...current, table_number: event.target.value }))}
-              placeholder="Table number"
+              placeholder={t("common.table")}
               required
               type="number"
               value={formState.table_number}
@@ -303,7 +305,7 @@ export default function AdminEventDayGamesPage() {
               className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
               min={1}
               onChange={(event) => setFormState((current) => ({ ...current, game_number: event.target.value }))}
-              placeholder="Game number"
+              placeholder={t("common.gameNumber")}
               required
               type="number"
               value={formState.game_number}
@@ -314,7 +316,7 @@ export default function AdminEventDayGamesPage() {
               required
               value={formState.format_id}
             >
-              <option value="">Select format</option>
+              <option value="">{t("common.format")}</option>
               {formats.map((gameFormat) => (
                 <option key={gameFormat.id} value={gameFormat.id}>
                   {gameFormat.format_name} ({gameFormat.player_count})
@@ -327,7 +329,7 @@ export default function AdminEventDayGamesPage() {
               required
               value={formState.judge_user_id}
             >
-              <option value="">Select judge</option>
+              <option value="">{t("common.judge")}</option>
               {judges.map((judge) => (
                 <option key={judge.id} value={judge.id}>
                   {judge.display_name} ({judge.username})
@@ -341,7 +343,7 @@ export default function AdminEventDayGamesPage() {
             >
               {gameTypes.map((gameType) => (
                 <option key={gameType} value={gameType}>
-                  {gameType}
+                  {enumLabel("gameType", gameType)}
                 </option>
               ))}
             </select>
@@ -352,7 +354,7 @@ export default function AdminEventDayGamesPage() {
             >
               {gameStatuses.map((status) => (
                 <option key={status} value={status}>
-                  {status}
+                  {enumLabel("gameStatus", status)}
                 </option>
               ))}
             </select>
@@ -371,7 +373,7 @@ export default function AdminEventDayGamesPage() {
             <textarea
               className="min-h-28 rounded-2xl border border-slate-200 px-4 py-3 text-sm"
               onChange={(event) => setFormState((current) => ({ ...current, notes: event.target.value }))}
-              placeholder="Notes"
+              placeholder={t("common.note")}
               value={formState.notes}
             />
             <button
@@ -379,7 +381,7 @@ export default function AdminEventDayGamesPage() {
               disabled={isSaving}
               type="submit"
             >
-              {isSaving ? "Saving..." : selectedGame ? "Save Game" : "Create Game"}
+              {isSaving ? t("resultEntry.saving") : selectedGame ? t("common.save") : t("admin.createGame")}
             </button>
           </form>
         </section>

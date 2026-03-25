@@ -10,6 +10,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
+import { useI18n } from "@/components/language-provider";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { formatDate, toDateInputValue } from "@/lib/date";
@@ -27,6 +28,7 @@ const seasonStatuses: SeasonStatus[] = ["draft", "active", "completed", "archive
 
 
 export default function AdminSeasonsPage() {
+  const { t, enumLabel } = useI18n();
   const { token, profile, isLoading } = useAuthenticatedSession({ requiredRole: "admin" });
   const [seasons, setSeasons] = useState<SeasonRecord[]>([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState<number | null>(null);
@@ -50,9 +52,9 @@ export default function AdminSeasonsPage() {
         setSeasons(response);
       })
       .catch((error) => {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to load seasons.");
+        setErrorMessage(error instanceof Error ? error.message : t("seasons.loadError"));
       });
-  }, [profile, token]);
+  }, [profile, t, token]);
 
   const selectedSeason = useMemo(
     () => seasons.find((season) => season.id === selectedSeasonId) ?? null,
@@ -60,7 +62,7 @@ export default function AdminSeasonsPage() {
   );
 
   if (isLoading) {
-    return <PageLoading message="Loading admin season management..." />;
+    return <PageLoading message={`${t("admin.seasons.title")}...`} />;
   }
 
   if (!profile) {
@@ -121,7 +123,7 @@ export default function AdminSeasonsPage() {
       setSelectedSeasonId(null);
       syncFormFromSeason(null);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to save the season.");
+      setErrorMessage(error instanceof Error ? error.message : t("common.failedToLoad"));
     } finally {
       setIsSaving(false);
     }
@@ -130,13 +132,13 @@ export default function AdminSeasonsPage() {
   return (
     <SiteShell
       profile={profile}
-      title="Admin · Seasons"
-      description="Create and edit seasons. Event days are created from each season detail page."
+      title={t("admin.seasons.title")}
+      description={t("seasons.description")}
     >
       <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
         <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-2xl font-bold text-ink">Existing Seasons</h2>
+            <h2 className="text-2xl font-bold text-ink">{t("admin.existingSeasons")}</h2>
             <button
               className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
               onClick={() => {
@@ -145,7 +147,7 @@ export default function AdminSeasonsPage() {
               }}
               type="button"
             >
-              Create New
+              {t("common.create")}
             </button>
           </div>
 
@@ -156,9 +158,12 @@ export default function AdminSeasonsPage() {
                   <div>
                     <h3 className="text-xl font-semibold text-ink">{season.name}</h3>
                     <p className="mt-2 text-sm text-slate-600">
-                      {formatDate(season.start_date)} to {formatDate(season.end_date)}
+                      {t("common.datesRange", {
+                        start: formatDate(season.start_date),
+                        end: formatDate(season.end_date),
+                      })}
                     </p>
-                    <p className="mt-2 text-sm text-slate-600">{season.status}</p>
+                    <p className="mt-2 text-sm text-slate-600">{enumLabel("seasonStatus", season.status)}</p>
                   </div>
                   <div className="flex flex-wrap gap-3">
                     <button
@@ -169,10 +174,10 @@ export default function AdminSeasonsPage() {
                       }}
                       type="button"
                     >
-                      Edit
+                      {t("common.edit")}
                     </button>
                     <Link className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200" href={`/seasons/${season.id}`}>
-                      Open
+                      {t("common.view")}
                     </Link>
                   </div>
                 </div>
@@ -182,21 +187,21 @@ export default function AdminSeasonsPage() {
         </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
-          <h2 className="text-2xl font-bold text-ink">{selectedSeason ? "Edit Season" : "Create Season"}</h2>
+          <h2 className="text-2xl font-bold text-ink">{selectedSeason ? t("seasons.editSeason") : t("admin.createSeason")}</h2>
           {errorMessage ? <div className="mt-4"><PageError message={errorMessage} /></div> : null}
 
           <form className="mt-5 grid gap-4" onSubmit={handleSubmit}>
             <input
               className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
               onChange={(event) => setFormState((current) => ({ ...current, name: event.target.value }))}
-              placeholder="Season name"
+              placeholder={t("seasons.title")}
               required
               value={formState.name}
             />
             <textarea
               className="min-h-28 rounded-2xl border border-slate-200 px-4 py-3 text-sm"
               onChange={(event) => setFormState((current) => ({ ...current, description: event.target.value }))}
-              placeholder="Description"
+              placeholder={t("common.note")}
               value={formState.description}
             />
             <input
@@ -220,7 +225,7 @@ export default function AdminSeasonsPage() {
             >
               {seasonStatuses.map((status) => (
                 <option key={status} value={status}>
-                  {status}
+                  {enumLabel("seasonStatus", status)}
                 </option>
               ))}
             </select>
@@ -229,7 +234,7 @@ export default function AdminSeasonsPage() {
               disabled={isSaving}
               type="submit"
             >
-              {isSaving ? "Saving..." : selectedSeason ? "Save Season" : "Create Season"}
+              {isSaving ? t("resultEntry.saving") : selectedSeason ? t("common.save") : t("admin.createSeason")}
             </button>
           </form>
         </section>
