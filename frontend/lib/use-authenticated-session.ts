@@ -15,6 +15,7 @@ import { getCurrentUser, type CurrentUserResponse, type RoleKey } from "@/lib/ap
 
 type UseAuthenticatedSessionOptions = {
   requiredRole?: RoleKey;
+  requiredRoles?: RoleKey[];
 };
 
 
@@ -24,8 +25,12 @@ export function useAuthenticatedSession(options: UseAuthenticatedSessionOptions 
   const [profile, setProfile] = useState<CurrentUserResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const requiredRolesKey = (options.requiredRoles ?? []).join(",");
 
   useEffect(() => {
+    const requiredRoles = options.requiredRoles ?? (
+      options.requiredRole ? [options.requiredRole] : []
+    );
     const storedToken = getStoredAccessToken();
     if (!storedToken) {
       router.replace("/login");
@@ -36,7 +41,10 @@ export function useAuthenticatedSession(options: UseAuthenticatedSessionOptions 
 
     void getCurrentUser(storedToken)
       .then((response) => {
-        if (options.requiredRole && !response.roles.includes(options.requiredRole)) {
+        if (
+          requiredRoles.length > 0 &&
+          !requiredRoles.some((role) => response.roles.includes(role))
+        ) {
           // Client-side route protection improves UX, but server-side role checks
           // remain the authoritative enforcement mechanism.
           router.replace("/");
@@ -51,7 +59,7 @@ export function useAuthenticatedSession(options: UseAuthenticatedSessionOptions 
         setIsLoading(false);
         router.replace("/login");
       });
-  }, [options.requiredRole, router]);
+  }, [options.requiredRole, requiredRolesKey, router]);
 
   return {
     token,

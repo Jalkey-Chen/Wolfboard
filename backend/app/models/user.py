@@ -45,6 +45,9 @@ class User(Base):
     created_seasons = relationship("Season", back_populates="creator")
     created_event_days = relationship("EventDay", back_populates="creator")
     registrations = relationship("Registration", back_populates="user")
+    judged_games = relationship("Game", foreign_keys="Game.judge_user_id", back_populates="judge")
+    submitted_games = relationship("Game", foreign_keys="Game.submitted_by", back_populates="submitter")
+    confirmed_games = relationship("Game", foreign_keys="Game.confirmed_by", back_populates="confirmer")
 
     @property
     def roles(self) -> list[str]:

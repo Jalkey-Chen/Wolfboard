@@ -8,16 +8,20 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.models.game import Game
 from app.models.event_day import EventDay
 from app.models.registration import Registration
 from app.models.season import Season
 from app.models.user import User
+from app.models.user_role import UserRole
 from app.schemas.event_day import EventDayCreate, EventDayUpdate
 
 
 EVENT_DAY_LOAD_OPTIONS = (
     selectinload(EventDay.season),
     selectinload(EventDay.registrations).selectinload(Registration.user),
+    selectinload(EventDay.games).selectinload(Game.format),
+    selectinload(EventDay.games).selectinload(Game.judge).selectinload(User.user_roles).selectinload(UserRole.role),
 )
 
 

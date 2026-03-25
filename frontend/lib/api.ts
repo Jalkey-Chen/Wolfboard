@@ -1,6 +1,9 @@
 /**
- * Typed frontend API client for authentication, season, event-day, and
- * registration flows used by Milestones 1 and 2.
+ * Typed frontend API client for the current Wolfboard MVP surface.
+ *
+ * Milestone 3 expands the client with preset-format browsing, admin game
+ * management, and judge-owned game queues while preserving all Milestone 1 and
+ * Milestone 2 auth, season, and registration flows.
  */
 export type RoleKey = "admin" | "judge" | "player";
 export type SeasonStatus = "draft" | "active" | "completed" | "archived";
@@ -15,6 +18,16 @@ export type EventDayStatus =
 export type RegistrationStatus = "registered" | "waitlisted" | "cancelled";
 export type CheckInStatus = "not_checked_in" | "checked_in" | "absent";
 export type RegistrationType = "main" | "substitute" | "guest";
+export type FormatCategory = "standard" | "special" | "fun";
+export type FormatRoleFaction = "good" | "wolf" | "third_party" | "special";
+export type GameType = "official" | "fun" | "practice";
+export type GameStatus =
+  | "draft"
+  | "in_progress"
+  | "submitted"
+  | "confirmed"
+  | "revised"
+  | "cancelled";
 
 export type UserPayload = {
   id: number;
@@ -82,10 +95,79 @@ export type RegistrationRecord = {
   updated_at: string;
 };
 
+export type GameFormatRecord = {
+  id: number;
+  format_name: string;
+  format_key: string;
+  player_count: number;
+  category: FormatCategory;
+  description: string | null;
+  is_active: boolean;
+  is_system_preset: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FormatRoleRecord = {
+  id: number;
+  format_id: number;
+  role_name: string;
+  faction: FormatRoleFaction;
+  role_count: number;
+  display_order: number;
+  metadata_json: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GameFormatDetail = GameFormatRecord & {
+  roles: FormatRoleRecord[];
+};
+
+export type JudgeOptionRecord = {
+  id: number;
+  username: string;
+  display_name: string;
+};
+
+export type GameSummary = {
+  id: number;
+  event_day_id: number;
+  season_id: number;
+  season_name: string;
+  event_day_title: string;
+  event_day_date: string;
+  game_number: number;
+  table_number: number;
+  format_id: number;
+  format_name: string;
+  judge_user_id: number;
+  judge_display_name: string;
+  game_type: GameType;
+  status: GameStatus;
+  started_at: string | null;
+  ended_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GameDetail = GameSummary & {
+  event_day_venue: string;
+  format: Pick<GameFormatRecord, "id" | "format_name" | "format_key" | "player_count">;
+  judge: JudgeOptionRecord;
+  submitted_at: string | null;
+  submitted_by: number | null;
+  confirmed_at: string | null;
+  confirmed_by: number | null;
+};
+
 export type EventDayDetail = EventDaySummary & {
   notes: string | null;
   season_name: string;
   registration_count: number;
+  game_count: number;
+  games: GameSummary[];
   viewer_registration: RegistrationRecord | null;
 };
 
@@ -123,6 +205,26 @@ export type RegistrationAdminUpdatePayload = {
   check_in_status?: CheckInStatus;
   registration_type?: RegistrationType;
   note?: string | null;
+};
+
+export type GameCreatePayload = {
+  event_day_id: number;
+  game_number: number;
+  table_number: number;
+  format_id: number;
+  judge_user_id: number;
+  game_type: GameType;
+  status: GameStatus;
+  notes?: string | null;
+  started_at?: string | null;
+  ended_at?: string | null;
+};
+
+export type GameUpdatePayload = Partial<Omit<GameCreatePayload, "event_day_id">>;
+
+export type GameFormatUpdatePayload = {
+  is_active?: boolean;
+  description?: string | null;
 };
 
 const API_BASE_URL =
@@ -277,4 +379,70 @@ export function updateRegistration(
     method: "PATCH",
     body: JSON.stringify(payload),
   }));
+}
+
+
+export function getFormats(token: string): Promise<GameFormatRecord[]> {
+  return request<GameFormatRecord[]>("/formats", withAuth(token));
+}
+
+
+export function getFormat(token: string, formatId: number): Promise<GameFormatDetail> {
+  return request<GameFormatDetail>(`/formats/${formatId}`, withAuth(token));
+}
+
+
+export function updateFormat(
+  token: string,
+  formatId: number,
+  payload: GameFormatUpdatePayload,
+): Promise<GameFormatDetail> {
+  return request<GameFormatDetail>(`/formats/${formatId}`, withAuth(token, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  }));
+}
+
+
+export function getEventDayGames(token: string, eventDayId: number): Promise<GameSummary[]> {
+  return request<GameSummary[]>(`/event-days/${eventDayId}/games`, withAuth(token));
+}
+
+
+export function createGame(token: string, payload: GameCreatePayload): Promise<GameDetail> {
+  return request<GameDetail>("/games", withAuth(token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }));
+}
+
+
+export function getGame(token: string, gameId: number): Promise<GameDetail> {
+  return request<GameDetail>(`/games/${gameId}`, withAuth(token));
+}
+
+
+export function updateGame(
+  token: string,
+  gameId: number,
+  payload: GameUpdatePayload,
+): Promise<GameDetail> {
+  return request<GameDetail>(`/games/${gameId}`, withAuth(token, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  }));
+}
+
+
+export function getJudgeOwnedGames(
+  token: string,
+  status?: GameStatus,
+): Promise<GameSummary[]> {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  return request<GameSummary[]>(`/judges/me/games${query}`, withAuth(token));
+}
+
+
+export function getJudgeOptions(token: string): Promise<JudgeOptionRecord[]> {
+  return request<JudgeOptionRecord[]>("/users/judges", withAuth(token));
 }

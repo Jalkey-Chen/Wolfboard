@@ -127,6 +127,9 @@ export default function AdminEventDayPage() {
             <Link className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800" href={`/admin/event-days/${eventDay.id}/registrations`}>
               Manage Registrations
             </Link>
+            <Link className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200" href={`/admin/event-days/${eventDay.id}/games`}>
+              Manage Games
+            </Link>
           </div>
         ) : null
       }
@@ -208,7 +211,7 @@ export default function AdminEventDayPage() {
 
         {eventDay ? (
           <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
-            <h2 className="text-2xl font-bold text-ink">Registration Snapshot</h2>
+            <h2 className="text-2xl font-bold text-ink">Event Snapshot</h2>
             <div className="mt-5 space-y-4 text-sm text-slate-700">
               <div className="rounded-2xl bg-slate-50 px-4 py-4">
                 <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Current Registration Window</div>
@@ -219,6 +222,10 @@ export default function AdminEventDayPage() {
               <div className="rounded-2xl bg-slate-50 px-4 py-4">
                 <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Current Registration Count</div>
                 <div className="mt-2">{eventDay.registration_count}</div>
+              </div>
+              <div className="rounded-2xl bg-slate-50 px-4 py-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Current Game Count</div>
+                <div className="mt-2">{eventDay.game_count}</div>
               </div>
             </div>
           </section>
