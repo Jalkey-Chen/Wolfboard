@@ -276,7 +276,6 @@ def save_game_result_draft(db: Session, game: Game, payload: GameResultDraftWrit
 
     replace_game_result_rows(db, game, payload, current_user)
     game.status = GameStatus.IN_PROGRESS
-    db.add(game)
     db.commit()
     return get_game_result_or_404(db, game.id)
 
@@ -293,6 +292,5 @@ def submit_game_result(db: Session, game: Game, current_user: User) -> Game:
     game.status = GameStatus.SUBMITTED
     game.submitted_at = datetime.now(timezone.utc)
     game.submitted_by = current_user.id
-    db.add(game)
     db.commit()
     return get_game_result_or_404(db, game.id)

@@ -120,7 +120,6 @@ def confirm_game_result(db: Session, game: Game, current_user: User, *, comment:
     game.status = GameStatus.CONFIRMED
     game.confirmed_at = now
     game.confirmed_by = current_user.id
-    db.add(game)
 
     _write_result_confirmation(
         db,
@@ -165,7 +164,6 @@ def reject_game_result(db: Session, game: Game, current_user: User, *, comment: 
     game.status = GameStatus.DRAFT
     game.submitted_at = None
     game.submitted_by = None
-    db.add(game)
 
     _write_result_confirmation(
         db,
@@ -227,7 +225,6 @@ def revise_game_result(db: Session, game: Game, payload: GameRevisionWrite, curr
     game.status = GameStatus.REVISED
     game.confirmed_at = datetime.now(timezone.utc)
     game.confirmed_by = current_user.id
-    db.add(game)
 
     _write_result_confirmation(
         db,
