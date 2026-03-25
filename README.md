@@ -1,22 +1,35 @@
 # Wolfboard
 
-Wolfboard is a web-based Werewolf tournament recording platform. This repository currently contains **Milestone 1: project scaffold and authentication foundation**.
+Wolfboard is a web-based Werewolf tournament recording platform. This repository currently contains **Milestone 2: season, event day, registration, and check-in flows** on top of the Milestone 1 scaffold.
 
 ## Scope
 
-Milestone 1 includes:
+Milestone 2 includes:
 
 - Monorepo structure with `frontend/` and `backend/`
 - FastAPI backend with PostgreSQL connectivity
-- SQLAlchemy 2.0 models for `users`, `roles`, and `user_roles`
+- SQLAlchemy 2.0 models for:
+  - `users`
+  - `roles`
+  - `user_roles`
+  - `seasons`
+  - `event_days`
+  - `registrations`
 - Alembic migration setup
 - JWT authentication with multi-role responses
 - FastAPI role dependencies for future resource-level authorization
-- Next.js App Router frontend with a login page and role-aware placeholder dashboard
+- Next.js App Router frontend with:
+  - login
+  - role-aware home page
+  - season list and detail pages
+  - event-day detail page
+  - admin season management page
+  - admin event-day management page
+  - admin registration and check-in page
 - Docker Compose for local startup
-- Seed script with default roles and sample users
+- Seed script with sample users, season data, event days, and registrations
 
-Milestone 1 does **not** include seasons, event days, games, leaderboards, or event flow logic.
+Milestone 2 does **not** include games, game players, scoreboards, result entry, or event flow logic.
 
 ## Repository Structure
 
@@ -83,7 +96,13 @@ BACKEND_CORS_ORIGINS=http://localhost:3000
 uv run alembic upgrade head
 ```
 
-### 4. Seed default roles and users
+To generate a new migration after model changes:
+
+```bash
+uv run alembic revision --autogenerate -m "describe your change"
+```
+
+### 4. Seed default roles, users, seasons, event days, and registrations
 
 ```bash
 uv run python -m app.scripts.seed
@@ -129,7 +148,7 @@ docker compose up --build
 When the backend container starts, it automatically:
 
 1. Applies Alembic migrations
-2. Seeds default roles and users
+2. Seeds default roles, users, seasons, event days, and registrations
 3. Starts the FastAPI server
 
 ## Seeded Test Accounts
@@ -145,6 +164,12 @@ Available accounts:
 - `admin_user` → `["admin", "judge", "player"]`
 - `judge_user` → `["judge", "player"]`
 - `player_user` → `["player"]`
+
+Sample seeded competition data:
+
+- `S1 Trial Season` → active
+- `2026-04-05 Official Match Day` → `open_for_registration`
+- `2026-03-29 Community Match Day` → `registration_closed`
 
 ## Authentication Flow
 
@@ -188,18 +213,54 @@ Authorization: Bearer <access_token>
 
 Returns the authenticated user profile and all assigned system roles.
 
+## Milestone 2 API Summary
+
+- `GET /api/v1/seasons`
+- `POST /api/v1/seasons`
+- `GET /api/v1/seasons/{season_id}`
+- `PATCH /api/v1/seasons/{season_id}`
+- `GET /api/v1/seasons/{season_id}/event-days`
+- `GET /api/v1/event-days/{event_day_id}`
+- `POST /api/v1/event-days`
+- `PATCH /api/v1/event-days/{event_day_id}`
+- `GET /api/v1/event-days/{event_day_id}/registrations`
+- `POST /api/v1/event-days/{event_day_id}/registrations`
+- `PATCH /api/v1/registrations/{registration_id}`
+- `PATCH /api/v1/registrations/{registration_id}/cancel`
+
 ## Validation Steps
+
+### Player registration flow
 
 1. Run `docker compose up --build`.
 2. Open `http://localhost:3000/login`.
-3. Sign in with `admin_user / password123`.
-4. Confirm the frontend redirects to `/`.
-5. Confirm the homepage shows the admin, judge, and player placeholder cards.
-6. Open `http://localhost:8000/docs` and inspect `POST /api/v1/auth/login` plus `GET /api/v1/auth/me`.
-7. Use the returned JWT in `GET /api/v1/auth/me` and confirm the response includes the full role array.
+3. Sign in with `player_user / password123`.
+4. Open `http://localhost:3000/event-days/1`.
+5. Click `Register`.
+6. Refresh the page and confirm your registration status now appears.
+
+### Admin season and check-in flow
+
+1. Sign in with `admin_user / password123`.
+2. Open `http://localhost:3000/admin/seasons`.
+3. Create a new season.
+4. Open any season detail page and create an event day, or open an existing event day from the season detail.
+5. Open `http://localhost:3000/admin/event-days/1/registrations`.
+6. Change a registration row to `checked_in`.
+7. Save the row and confirm the updated status persists.
+
+### Backend verification flow
+
+1. Open `http://localhost:8000/docs`.
+2. Authenticate with `POST /api/v1/auth/login`.
+3. Call `GET /api/v1/seasons` and `GET /api/v1/event-days/1`.
+4. Confirm `player_user` can register for the open event day.
+5. Confirm `admin_user` can update check-in status via `PATCH /api/v1/registrations/{id}`.
 
 ## Notes
 
 - Passwords are stored as bcrypt hashes through `passlib`.
 - Authorization is based on `users`, `roles`, and `user_roles`; there is no single `users.role_id`.
 - Role checks are centralized in FastAPI dependencies so later milestones can layer in resource-level ownership rules.
+- Normal users can only create registrations for themselves.
+- Admins can manage seasons, event days, registrations, and check-in state.
