@@ -1,10 +1,10 @@
 # Wolfboard
 
-Wolfboard is a web-based Werewolf tournament recording platform. This repository currently contains **Milestone 2: season, event day, registration, and check-in flows** on top of the Milestone 1 scaffold.
+Wolfboard is a web-based Werewolf tournament recording platform. This repository currently contains **Milestone 3: preset formats, event-day game management, judge assignment, and judge-owned game browsing** on top of the Milestone 1 and Milestone 2 foundations.
 
 ## Scope
 
-Milestone 2 includes:
+Milestone 3 includes:
 
 - Monorepo structure with `frontend/` and `backend/`
 - FastAPI backend with PostgreSQL connectivity
@@ -15,7 +15,10 @@ Milestone 2 includes:
   - `seasons`
   - `event_days`
   - `registrations`
-- Alembic migration setup
+  - `game_formats`
+  - `format_roles`
+  - `games`
+- Alembic migrations through Milestone 3
 - JWT authentication with multi-role responses
 - FastAPI role dependencies for future resource-level authorization
 - Next.js App Router frontend with:
@@ -23,13 +26,23 @@ Milestone 2 includes:
   - role-aware home page
   - season list and detail pages
   - event-day detail page
+  - preset format list and detail pages
+  - game detail page
+  - judge-owned games page
   - admin season management page
   - admin event-day management page
   - admin registration and check-in page
+  - admin game management page
 - Docker Compose for local startup
-- Seed script with sample users, season data, event days, and registrations
+- Seed script with sample users, season data, event days, registrations, preset formats, and sample games
 
-Milestone 2 does **not** include games, game players, scoreboards, result entry, or event flow logic.
+Milestone 3 does **not** include:
+
+- `game_players`
+- result entry
+- scoring or score logs
+- leaderboard logic
+- event-flow recording
 
 ## Repository Structure
 
@@ -68,7 +81,7 @@ Copy `.env.example` to `.env` if you want to customize defaults:
 Copy-Item .env.example .env
 ```
 
-The Docker setup will still run without a local `.env`, because `docker-compose.yml` includes safe default values for Milestone 1.
+The Docker setup still runs without a local `.env`, because `docker-compose.yml` includes safe default values for local development.
 
 ## Local Backend Setup With uv
 
@@ -102,11 +115,13 @@ To generate a new migration after model changes:
 uv run alembic revision --autogenerate -m "describe your change"
 ```
 
-### 4. Seed default roles, users, seasons, event days, and registrations
+### 4. Seed default roles and milestone sample data
 
 ```bash
 uv run python -m app.scripts.seed
 ```
+
+The seed is idempotent for the sample milestone data, so rerunning it is safe during local development.
 
 ### 5. Start the API
 
@@ -148,7 +163,7 @@ docker compose up --build
 When the backend container starts, it automatically:
 
 1. Applies Alembic migrations
-2. Seeds default roles, users, seasons, event days, and registrations
+2. Seeds default roles and milestone sample data
 3. Starts the FastAPI server
 
 ## Seeded Test Accounts
@@ -165,11 +180,43 @@ Available accounts:
 - `judge_user` → `["judge", "player"]`
 - `player_user` → `["player"]`
 
-Sample seeded competition data:
+## Seeded Sample Data
 
-- `S1 Trial Season` → active
+### Seasons and event days
+
+- `S1 Trial Season` → `active`
 - `2026-04-05 Official Match Day` → `open_for_registration`
 - `2026-03-29 Community Match Day` → `registration_closed`
+
+### Preset formats
+
+The seed adds at least these 10 preset formats:
+
+- `预女猎白混`
+- `狼王守卫`
+- `狼美骑士`
+- `机械狼通灵师`
+- `梦魇摄梦人`
+- `孤注一掷`
+- `盗宝大师`
+- `假面舞会`
+- `唯邻是从`
+- `魔幻对决`
+
+Each preset format also receives a seeded role composition in `format_roles`.
+
+### Sample games
+
+Seeded sample games include:
+
+- Match Day A:
+  - table 1 / game 1 / `official`
+  - table 1 / game 2 / `official`
+  - table 1 / game 3 / `official`
+- Match Day B:
+  - table 1 / game 1 / `fun`
+
+The sample games intentionally assign at least one game to `judge_user` and at least one game to `admin_user`.
 
 ## Authentication Flow
 
@@ -213,54 +260,70 @@ Authorization: Bearer <access_token>
 
 Returns the authenticated user profile and all assigned system roles.
 
-## Milestone 2 API Summary
+## Milestone 3 API Summary
 
-- `GET /api/v1/seasons`
-- `POST /api/v1/seasons`
-- `GET /api/v1/seasons/{season_id}`
-- `PATCH /api/v1/seasons/{season_id}`
-- `GET /api/v1/seasons/{season_id}/event-days`
-- `GET /api/v1/event-days/{event_day_id}`
-- `POST /api/v1/event-days`
-- `PATCH /api/v1/event-days/{event_day_id}`
-- `GET /api/v1/event-days/{event_day_id}/registrations`
-- `POST /api/v1/event-days/{event_day_id}/registrations`
-- `PATCH /api/v1/registrations/{registration_id}`
-- `PATCH /api/v1/registrations/{registration_id}/cancel`
+Existing Milestone 1 and 2 routes remain available. Milestone 3 adds:
+
+- `GET /api/v1/formats`
+- `GET /api/v1/formats/{format_id}`
+- `PATCH /api/v1/formats/{format_id}` for admin toggles
+- `GET /api/v1/event-days/{event_day_id}/games`
+- `POST /api/v1/games`
+- `GET /api/v1/games/{game_id}`
+- `PATCH /api/v1/games/{game_id}`
+- `GET /api/v1/judges/me/games`
+- `GET /api/v1/users/judges`
 
 ## Validation Steps
 
-### Player registration flow
+### Format verification
 
 1. Run `docker compose up --build`.
 2. Open `http://localhost:3000/login`.
-3. Sign in with `player_user / password123`.
-4. Open `http://localhost:3000/event-days/1`.
-5. Click `Register`.
-6. Refresh the page and confirm your registration status now appears.
+3. Sign in with any seeded account.
+4. Open `http://localhost:3000/formats`.
+5. Confirm the preset format list is visible.
+6. Open `http://localhost:3000/formats/1`.
+7. Confirm the role composition table is visible.
 
-### Admin season and check-in flow
+### Admin game management flow
 
 1. Sign in with `admin_user / password123`.
-2. Open `http://localhost:3000/admin/seasons`.
-3. Create a new season.
-4. Open any season detail page and create an event day, or open an existing event day from the season detail.
-5. Open `http://localhost:3000/admin/event-days/1/registrations`.
-6. Change a registration row to `checked_in`.
-7. Save the row and confirm the updated status persists.
+2. Open `http://localhost:3000/admin/event-days/1/games`.
+3. Confirm the page shows the existing seeded games.
+4. Create a new game by choosing:
+   - table number
+   - game number
+   - format
+   - judge
+   - game type
+   - status
+5. Save the game.
+6. Open `http://localhost:3000/event-days/1`.
+7. Confirm the new game appears in the event-day game list.
+
+### Judge visibility flow
+
+1. Sign in with `judge_user / password123`.
+2. Open `http://localhost:3000/judge/games`.
+3. Confirm only judge-owned games are shown.
+4. Open one of the listed game detail pages.
+5. Confirm the page is accessible.
+6. Try to mutate a game through an admin-only API such as `PATCH /api/v1/games/{id}` and confirm the backend returns `403`.
 
 ### Backend verification flow
 
 1. Open `http://localhost:8000/docs`.
 2. Authenticate with `POST /api/v1/auth/login`.
-3. Call `GET /api/v1/seasons` and `GET /api/v1/event-days/1`.
-4. Confirm `player_user` can register for the open event day.
-5. Confirm `admin_user` can update check-in status via `PATCH /api/v1/registrations/{id}`.
+3. Call `GET /api/v1/formats` and confirm the seeded presets are returned.
+4. Call `GET /api/v1/event-days/1` and confirm the response includes a `games` array.
+5. Call `GET /api/v1/judges/me/games` as `judge_user` and confirm only assigned games are returned.
 
 ## Notes
 
 - Passwords are stored as bcrypt hashes through `passlib`.
 - Authorization is based on `users`, `roles`, and `user_roles`; there is no single `users.role_id`.
 - Role checks are centralized in FastAPI dependencies so later milestones can layer in resource-level ownership rules.
-- Normal users can only create registrations for themselves.
-- Admins can manage seasons, event days, registrations, and check-in state.
+- Admins manage seasons, event days, registrations, check-in state, formats, and games.
+- Judges can only access the game queue that belongs to them.
+- Result-entry, player-per-game data, score logs, and event flow are intentionally deferred to later milestones.

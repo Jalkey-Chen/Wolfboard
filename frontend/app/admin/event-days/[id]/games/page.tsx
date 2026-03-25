@@ -49,6 +49,8 @@ type FormState = {
 
 
 function emptyFormState(): FormState {
+  /** Return a blank admin form state for a new game row. */
+
   return {
     game_number: "",
     table_number: "",
@@ -64,6 +66,8 @@ function emptyFormState(): FormState {
 
 
 function buildFormState(game: GameSummary | null): FormState {
+  /** Reuse the same form for editing by translating summary data to inputs. */
+
   if (!game) {
     return emptyFormState();
   }
@@ -162,6 +166,8 @@ export default function AdminEventDayGamesPage() {
 
     try {
       if (selectedGame) {
+        // Reusing the create form for edits keeps table/game/format assignment
+        // changes on one screen, which is faster for event-day operations.
         await updateGame(token, selectedGame.id, {
           game_number: payload.game_number,
           table_number: payload.table_number,

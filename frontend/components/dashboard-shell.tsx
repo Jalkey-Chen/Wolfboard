@@ -71,6 +71,8 @@ export function DashboardShell() {
 
     void getEventDay(token, recentEventDayId)
       .then((response) => {
+        // The dashboard keeps one richer event-day payload around so recent
+        // game cards can be rendered without over-fetching every season row.
         setRecentEventDayDetail(response);
       })
       .catch((error) => {

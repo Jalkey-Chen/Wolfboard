@@ -81,7 +81,13 @@ def validate_judge_assignment(db: Session, judge_user_id: int) -> User:
 
 
 def validate_references(db: Session, payload: GameCreate | GameUpdate, event_day_id: int | None = None) -> None:
-    """Validate that referenced event-day, format, and judge rows exist."""
+    """Validate that referenced event-day, format, and judge rows exist.
+
+    Game creation and editing happen from admin-controlled forms that submit
+    integer foreign keys. This helper keeps referential validation in one
+    place, so both create and update flows fail consistently before any write
+    attempts hit the database.
+    """
 
     resolved_event_day_id = event_day_id if event_day_id is not None else payload.event_day_id
     if resolved_event_day_id is not None and db.get(EventDay, resolved_event_day_id) is None:
@@ -97,7 +103,12 @@ def validate_references(db: Session, payload: GameCreate | GameUpdate, event_day
 
 
 def persist_game(db: Session, game: Game) -> Game:
-    """Persist a game while mapping uniqueness conflicts to a 400 response."""
+    """Persist a game while mapping uniqueness conflicts to a 400 response.
+
+    The unique constraint on `(event_day_id, table_number, game_number)` is a
+    core scheduling invariant. Surfacing a user-facing validation error here is
+    clearer than leaking a raw database integrity exception back to the client.
+    """
 
     db.add(game)
     try:

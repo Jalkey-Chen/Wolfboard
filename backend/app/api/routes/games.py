@@ -32,6 +32,8 @@ def build_game_detail_payload(game_id: int, db: Session, current_user: User) -> 
         event_day_venue=game.event_day.venue,
         format=game.format,
         judge=game.judge,
+        # Lifecycle metadata stays hidden from unrelated viewers even though the
+        # public setup fields of a game are already visible on event-day pages.
         submitted_at=game.submitted_at if can_view_internal_fields else None,
         submitted_by=game.submitted_by if can_view_internal_fields else None,
         confirmed_at=game.confirmed_at if can_view_internal_fields else None,

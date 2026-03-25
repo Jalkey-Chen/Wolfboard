@@ -63,6 +63,8 @@ export function SiteShell({
                 <Link className="rounded-full bg-slate-100 px-4 py-2 hover:bg-slate-200" href="/formats">
                   Formats
                 </Link>
+                {/* Judge navigation is intentionally role-aware because the page
+                    represents an owned work queue rather than a public index. */}
                 {canOpenJudgeQueue ? (
                   <Link className="rounded-full bg-slate-100 px-4 py-2 hover:bg-slate-200" href="/judge/games">
                     Judge Games
