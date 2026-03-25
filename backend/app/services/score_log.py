@@ -45,6 +45,8 @@ def create_effective_score_logs_for_game(db: Session, game: Game, *, note: str |
         created_logs.append(score_log)
 
     db.flush()
+    # Balances are recomputed after every confirm or revise action so the
+    # season ledger stays consistent even when older games are revised later.
     recalculate_season_balances(db, game.season_id, user_ids={player.user_id for player in game.players if player.user_id is not None})
     return created_logs
 
@@ -73,4 +75,3 @@ def recalculate_season_balances(db: Session, season_id: int | None, *, user_ids:
         balances[score_log.user_id] += score_log.delta
         score_log.balance_after = balances[score_log.user_id]
         db.add(score_log)
-

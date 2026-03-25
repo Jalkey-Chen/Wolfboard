@@ -239,6 +239,9 @@ export default function AdminGameReviewPage() {
 
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
               <h2 className="text-2xl font-bold text-ink">Admin Actions</h2>
+              {/* Confirmation and rejection stay separate here on purpose so the
+                  admin has to make an explicit decision before a result becomes
+                  effective in the formal score ledger. */}
               <div className="mt-5 grid gap-4 xl:grid-cols-2">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
                   <label className="text-sm font-semibold text-slate-700" htmlFor="confirm-comment">
@@ -289,4 +292,3 @@ export default function AdminGameReviewPage() {
     </SiteShell>
   );
 }
-

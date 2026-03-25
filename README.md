@@ -1,10 +1,10 @@
 # Wolfboard
 
-Wolfboard is a web-based Werewolf tournament recording platform. This repository currently contains **Milestone 4: judge-owned result entry, draft persistence, score preview, and result submission** on top of the Milestone 1 through Milestone 3 foundations.
+Wolfboard is a web-based Werewolf tournament recording platform. This repository currently contains **Milestone 5: admin confirmation, revision, formal score logs, leaderboard, player profiles, and audit tracking** on top of the Milestone 1 through Milestone 4 foundations.
 
 ## Scope
 
-Milestone 4 includes:
+Milestone 5 includes:
 
 - Monorepo structure with `frontend/` and `backend/`
 - FastAPI backend with PostgreSQL connectivity
@@ -20,7 +20,11 @@ Milestone 4 includes:
   - `games`
   - `game_players`
   - `score_adjustments`
-- Alembic migrations through Milestone 4
+  - `score_logs`
+  - `result_confirmations`
+  - `audit_logs`
+  - `game_status_history`
+- Alembic migrations through Milestone 5
 - JWT authentication with multi-role responses
 - FastAPI role dependencies for future resource-level authorization
 - Next.js App Router frontend with:
@@ -32,6 +36,11 @@ Milestone 4 includes:
   - game detail page
   - judge-owned games page
   - judge-owned result entry page
+  - admin review queue page
+  - admin review detail page
+  - admin revision page
+  - leaderboard page
+  - player profile page
   - admin season management page
   - admin event-day management page
   - admin registration and check-in page
@@ -39,12 +48,11 @@ Milestone 4 includes:
 - Docker Compose for local startup
 - Seed script with sample users, season data, event days, registrations, preset formats, sample games, and result-entry-ready player pools
 
-Milestone 4 does **not** include:
+Milestone 5 does **not** include:
 
-- result confirmation
-- score logs
-- leaderboard logic
 - event-flow recording
+- full event replay tooling
+- automated rule adjudication
 
 ## Repository Structure
 
@@ -271,9 +279,9 @@ Authorization: Bearer <access_token>
 
 Returns the authenticated user profile and all assigned system roles.
 
-## Milestone 4 API Summary
+## Milestone 5 API Summary
 
-Existing Milestone 1 to 3 routes remain available. Milestone 4 adds:
+Existing Milestone 1 to 4 routes remain available. Milestone 5 adds:
 
 - `GET /api/v1/formats`
 - `GET /api/v1/formats/{format_id}`
@@ -287,6 +295,13 @@ Existing Milestone 1 to 3 routes remain available. Milestone 4 adds:
 - `GET /api/v1/games/{game_id}/result-draft`
 - `PUT /api/v1/games/{game_id}/result-draft`
 - `POST /api/v1/games/{game_id}/submit-result`
+- `GET /api/v1/admin/games/review`
+- `POST /api/v1/games/{game_id}/confirm-result`
+- `POST /api/v1/games/{game_id}/reject-result`
+- `POST /api/v1/games/{game_id}/revise-result`
+- `GET /api/v1/seasons/{season_id}/leaderboard`
+- `GET /api/v1/players/{player_id}/profile`
+- `GET /api/v1/audit-logs`
 
 ## Validation Steps
 
@@ -355,6 +370,32 @@ Existing Milestone 1 to 3 routes remain available. Milestone 4 adds:
 6. As `judge_user`, try to call `PUT /api/v1/games/{id}/result-draft` after the same game has been submitted.
 7. Confirm the backend rejects the update.
 
+### Admin confirmation flow
+
+1. Sign in with `admin_user / password123`.
+2. Open `http://localhost:3000/admin/games/review`.
+3. Open one submitted game.
+4. Click `Confirm Result`.
+5. Open `http://localhost:3000/leaderboard`.
+6. Confirm the leaderboard now reflects the effective score logs from that confirmed official game.
+
+### Admin revision flow
+
+1. Open a confirmed or revised game review page.
+2. Click `Revise Result`.
+3. Change one or more player outcomes or score adjustments.
+4. Enter a revision reason.
+5. Submit the revision.
+6. Confirm the game status becomes `revised`.
+7. Confirm old score logs are `voided` and new score logs are `effective`.
+
+### Leaderboard verification
+
+1. Open `http://localhost:3000/leaderboard`.
+2. Select the active season.
+3. Confirm only effective logs from `official` games with status `confirmed` or `revised` are counted.
+4. Open one player profile from the leaderboard table and confirm the effective game history is visible.
+
 ### Backend verification flow
 
 1. Open `http://localhost:8000/docs`.
@@ -364,6 +405,10 @@ Existing Milestone 1 to 3 routes remain available. Milestone 4 adds:
 5. Call `GET /api/v1/judges/me/games` as `judge_user` and confirm only assigned games are returned.
 6. Call `GET /api/v1/games/{id}/result-draft` as the assigned judge and confirm the payload includes `players`, `adjustments`, `format_roles`, `selectable_players`, and `validation`.
 7. Call `POST /api/v1/games/{id}/submit-result` after saving a valid draft and confirm the returned status is `submitted`.
+8. Call `POST /api/v1/games/{id}/confirm-result` as `admin_user` and confirm score logs are written.
+9. Call `POST /api/v1/games/{id}/revise-result` and confirm the previous game score logs become `voided`.
+10. Call `GET /api/v1/audit-logs?entity_type=game` and confirm confirmation or revision actions are present.
+11. Call `GET /api/v1/players/{id}/profile` as the same player or an admin and confirm effective history is returned.
 
 ## Notes
 
@@ -373,4 +418,7 @@ Existing Milestone 1 to 3 routes remain available. Milestone 4 adds:
 - Admins manage seasons, event days, registrations, check-in state, formats, and games.
 - Judges can only access the game queue and result-entry routes that belong to them.
 - Result drafts always recompute base score, adjustment score, and final score on the backend.
-- Result confirmation, formal score logs, leaderboards, and event flow are intentionally deferred to later milestones.
+- Leaderboards are built from `score_logs`, not directly from `game_players`.
+- Admin confirmation and revision write both audit logs and game status history.
+- Revising a confirmed game voids the old ledger rows and writes new effective rows instead of mutating history in place.
+- Event flow is intentionally deferred to later milestones.
