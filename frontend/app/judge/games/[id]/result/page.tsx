@@ -290,7 +290,7 @@ export default function JudgeGameResultPage() {
     <SiteShell
       profile={profile}
       title={draft ? `${t("resultEntry.title")} · ${draft.game.table_number}桌 / 第${draft.game.game_number}局` : t("resultEntry.title")}
-      description={draft ? `${draft.game.season_name} · ${draft.game.event_day_title}` : "Judge-owned game result entry."}
+      description={draft ? `${draft.game.season_name} · ${draft.game.event_day_title}` : t("resultEntry.description")}
       actions={
         draft ? (
           <div className="flex flex-wrap gap-3">

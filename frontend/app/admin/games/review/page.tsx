@@ -57,7 +57,7 @@ export default function AdminGameReviewQueuePage() {
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-2xl font-bold text-ink">{t("review.submittedGames")}</h2>
             <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
-              {games.length} pending
+              {t("review.pendingCount", { count: games.length })}
             </span>
           </div>
 

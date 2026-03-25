@@ -43,11 +43,15 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(DEFAULT_LANGUAGE);
 
   useEffect(() => {
+    // Client preference is resolved after hydration so the server can keep the
+    // default Chinese shell stable for first render.
     setLanguageState(getStoredLanguage());
   }, []);
 
   useEffect(() => {
     persistLanguage(language);
+    // Keeping the root lang attribute in sync improves screen-reader behavior
+    // and helps the browser pick the correct locale-specific defaults.
     document.documentElement.lang = language === "zh" ? "zh-CN" : "en";
   }, [language]);
 

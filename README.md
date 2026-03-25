@@ -190,6 +190,12 @@ Available accounts:
 - `judge_user` → `["judge", "player"]`
 - `player_user` → `["player"]`
 
+## Language Support
+
+- The frontend now defaults to Simplified Chinese.
+- Users can switch between Chinese and English from the login page or the authenticated site shell.
+- The selected language is stored in browser `localStorage` under `wolfboard-language`.
+
 ## Seeded Sample Data
 
 ### Seasons and event days

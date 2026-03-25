@@ -294,6 +294,7 @@ const translations: Record<Language, TranslationDictionary> = {
     "review.revisionReason": "修订原因",
     "review.submittedGames": "已提交对局",
     "review.noSubmittedGames": "当前没有待审核的已提交对局。",
+    "review.pendingCount": "{count} 待处理",
     "audit.title": "审计日志",
     "admin.title": "后台管理",
     "admin.seasons.title": "赛季管理",
@@ -571,6 +572,7 @@ const translations: Record<Language, TranslationDictionary> = {
     "review.revisionReason": "Revision Reason",
     "review.submittedGames": "Submitted Games",
     "review.noSubmittedGames": "There are no submitted games waiting for review.",
+    "review.pendingCount": "{count} pending",
     "audit.title": "Audit Logs",
     "admin.title": "Admin",
     "admin.seasons.title": "Season Management",
@@ -680,6 +682,7 @@ function interpolate(template: string, values?: TranslationValues): string {
   );
 }
 
+/** Read the preferred language from localStorage with a safe Chinese fallback. */
 export function getStoredLanguage(): Language {
   if (typeof window === "undefined") {
     return DEFAULT_LANGUAGE;
@@ -689,6 +692,7 @@ export function getStoredLanguage(): Language {
   return stored === "en" || stored === "zh" ? stored : DEFAULT_LANGUAGE;
 }
 
+/** Persist the user's language choice for later visits. */
 export function persistLanguage(language: Language): void {
   if (typeof window === "undefined") {
     return;
@@ -697,10 +701,12 @@ export function persistLanguage(language: Language): void {
   window.localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
 }
 
+/** Map the app language to a browser locale used by date formatting helpers. */
 export function getLocaleForLanguage(language: Language): string {
   return language === "zh" ? "zh-CN" : "en-US";
 }
 
+/** Resolve a translated message and interpolate any template placeholders. */
 export function translate(
   language: Language,
   key: string,
@@ -710,6 +716,7 @@ export function translate(
   return interpolate(template, values);
 }
 
+/** Translate enum-backed status and category values shown throughout the UI. */
 export function translateEnum(
   language: Language,
   group: EnumGroup,
