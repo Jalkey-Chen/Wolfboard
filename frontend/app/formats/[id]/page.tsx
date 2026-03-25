@@ -11,13 +11,14 @@ import { useI18n } from "@/components/language-provider";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { getFormat, updateFormat, type GameFormatDetail } from "@/lib/api";
+import { translatePresetFormatDescription } from "@/lib/i18n";
 import { useAuthenticatedSession } from "@/lib/use-authenticated-session";
 
 
 export default function FormatDetailPage() {
   const params = useParams<{ id: string }>();
   const formatId = Number(params.id);
-  const { t, enumLabel } = useI18n();
+  const { t, enumLabel, language } = useI18n();
   const { token, profile, isLoading, hasRole } = useAuthenticatedSession();
   const [gameFormat, setGameFormat] = useState<GameFormatDetail | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -43,6 +44,10 @@ export default function FormatDetailPage() {
     return null;
   }
 
+  const infoLabelClass = language === "zh"
+    ? "text-xs font-semibold text-slate-400"
+    : "text-xs uppercase tracking-[0.18em] text-slate-400";
+
   async function handleToggleActive() {
     if (!token || !gameFormat) {
       return;
@@ -66,7 +71,11 @@ export default function FormatDetailPage() {
     <SiteShell
       profile={profile}
       title={gameFormat?.format_name ?? t("formats.title")}
-      description={gameFormat?.description ?? t("formats.description")}
+      description={
+        gameFormat
+          ? translatePresetFormatDescription(language, gameFormat.format_key, gameFormat.description)
+          : t("formats.description")
+      }
       actions={
         hasRole("admin") && gameFormat ? (
           <button
@@ -92,21 +101,21 @@ export default function FormatDetailPage() {
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
               <div className="grid gap-4 md:grid-cols-4">
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("formats.playerCount")}</div>
+                  <div className={infoLabelClass}>{t("formats.playerCount")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{gameFormat.player_count}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.category")}</div>
+                  <div className={infoLabelClass}>{t("common.category")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{enumLabel("formatCategory", gameFormat.category)}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.preset")}</div>
+                  <div className={infoLabelClass}>{t("common.preset")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">
                     {gameFormat.is_system_preset ? t("common.yes") : t("common.no")}
                   </div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.status")}</div>
+                  <div className={infoLabelClass}>{t("common.status")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">
                     {gameFormat.is_active ? t("formats.active") : t("formats.inactive")}
                   </div>

@@ -30,10 +30,16 @@ export function SiteShell({
   actions,
   children,
 }: SiteShellProps) {
-  const { t, enumLabel } = useI18n();
+  const { t, enumLabel, language } = useI18n();
   const isAdmin = profile.roles.includes("admin");
   const isJudge = profile.roles.includes("judge");
   const canOpenJudgeQueue = isAdmin || isJudge;
+  const overlineClass = language === "zh"
+    ? "text-sm font-semibold text-accent"
+    : "text-sm font-semibold uppercase tracking-[0.3em] text-accent";
+  const roleBadgeClass = language === "zh"
+    ? "rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-gold"
+    : "rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.15em] text-gold";
 
   return (
     <main className="min-h-screen px-6 py-8">
@@ -42,11 +48,11 @@ export function SiteShell({
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-3">
-                <p className="text-sm font-semibold uppercase tracking-[0.3em] text-accent">{t("brand.name")}</p>
+                <p className={overlineClass}>{t("brand.name")}</p>
                 {profile.roles.map((role) => (
                   <span
                     key={role}
-                    className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.15em] text-gold"
+                    className={roleBadgeClass}
                   >
                     {enumLabel("role", role)}
                   </span>

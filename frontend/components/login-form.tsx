@@ -18,11 +18,17 @@ import { getStoredAccessToken, setStoredAccessToken } from "@/lib/auth";
 
 export function LoginForm() {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const heroOverlineClass = language === "zh"
+    ? "text-sm font-semibold text-amber-300"
+    : "text-sm font-semibold uppercase tracking-[0.3em] text-amber-300";
+  const formOverlineClass = language === "zh"
+    ? "text-sm font-semibold text-accent"
+    : "text-sm font-semibold uppercase tracking-[0.28em] text-accent";
 
   useEffect(() => {
     if (getStoredAccessToken()) {
@@ -50,7 +56,7 @@ export function LoginForm() {
       <div className="grid w-full max-w-5xl gap-8 rounded-[2rem] border border-slate-200 bg-white/90 p-8 shadow-2xl shadow-slate-200/60 lg:grid-cols-[1.1fr_0.9fr]">
         <section className="rounded-[1.5rem] bg-gradient-to-br from-slate-950 via-slate-900 to-red-950 p-8 text-white">
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-300">{t("brand.name")}</p>
+            <p className={heroOverlineClass}>{t("brand.name")}</p>
             <LanguageSwitcher />
           </div>
           <h1 className="mt-6 max-w-md text-4xl font-bold leading-tight">
@@ -74,7 +80,7 @@ export function LoginForm() {
 
         <section className="flex flex-col justify-center rounded-[1.5rem] bg-slate-50 p-8">
           <div className="mb-8">
-            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-accent">{t("auth.signIn")}</p>
+            <p className={formOverlineClass}>{t("auth.signIn")}</p>
             <h2 className="mt-3 text-3xl font-bold text-ink">{t("auth.signInTitle")}</h2>
             <p className="mt-2 text-sm text-slate-600">
               {t("login.subtitle")}
