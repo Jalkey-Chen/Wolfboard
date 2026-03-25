@@ -1,9 +1,9 @@
 /**
  * Typed frontend API client for the current Wolfboard MVP surface.
  *
- * Milestone 3 expands the client with preset-format browsing, admin game
- * management, and judge-owned game queues while preserving all Milestone 1 and
- * Milestone 2 auth, season, and registration flows.
+ * Milestone 4 expands the client with result-draft reads, saves, and final
+ * submission while preserving the earlier auth, season, registration, format,
+ * and game-management flows.
  */
 export type RoleKey = "admin" | "judge" | "player";
 export type SeasonStatus = "draft" | "active" | "completed" | "archived";
@@ -21,6 +21,13 @@ export type RegistrationType = "main" | "substitute" | "guest";
 export type FormatCategory = "standard" | "special" | "fun";
 export type FormatRoleFaction = "good" | "wolf" | "third_party" | "special";
 export type GameType = "official" | "fun" | "practice";
+export type GamePlayerFaction = "good" | "wolf" | "third_party";
+export type GamePlayerFinalStatus = "alive" | "eliminated" | "unknown";
+export type ScoreAdjustmentType =
+  | "late_penalty"
+  | "conduct_penalty"
+  | "judge_bonus"
+  | "manual_adjustment";
 export type GameStatus =
   | "draft"
   | "in_progress"
@@ -156,10 +163,94 @@ export type GameDetail = GameSummary & {
   event_day_venue: string;
   format: Pick<GameFormatRecord, "id" | "format_name" | "format_key" | "player_count">;
   judge: JudgeOptionRecord;
+  has_result_draft: boolean;
   submitted_at: string | null;
   submitted_by: number | null;
   confirmed_at: string | null;
   confirmed_by: number | null;
+};
+
+export type ValidationMessage = {
+  code: string;
+  message: string;
+  field: string | null;
+};
+
+export type ValidationSummary = {
+  errors: ValidationMessage[];
+  warnings: ValidationMessage[];
+};
+
+export type SelectablePlayerRecord = {
+  user_id: number;
+  username: string;
+  display_name: string;
+  registration_status: string | null;
+  check_in_status: string | null;
+};
+
+export type GameResultPlayerDraftPayload = {
+  user_id: number | null;
+  seat_number: number | null;
+  role_name: string | null;
+  faction: GamePlayerFaction | null;
+  final_status: GamePlayerFinalStatus;
+  is_winner: boolean | null;
+  remarks: string | null;
+};
+
+export type GameResultAdjustmentPayload = {
+  target_seat_number: number;
+  adjustment_type: ScoreAdjustmentType;
+  delta: number;
+  reason: string | null;
+};
+
+export type GameResultDraftWritePayload = {
+  players: GameResultPlayerDraftPayload[];
+  adjustments: GameResultAdjustmentPayload[];
+};
+
+export type GameResultPlayerRecord = {
+  id: number;
+  game_id: number;
+  user_id: number | null;
+  username: string;
+  display_name: string;
+  seat_number: number | null;
+  role_name: string | null;
+  faction: GamePlayerFaction | null;
+  final_status: GamePlayerFinalStatus;
+  is_winner: boolean | null;
+  base_score: number;
+  adjustment_score: number;
+  final_score: number;
+  judge_bonus_note: string | null;
+  penalty_note: string | null;
+  remarks: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GameResultAdjustmentRecord = {
+  id: number;
+  game_player_id: number;
+  target_seat_number: number | null;
+  adjustment_type: ScoreAdjustmentType;
+  delta: number;
+  reason: string | null;
+  created_by: number;
+  created_at: string;
+};
+
+export type GameResultDraftResponse = {
+  game: GameDetail;
+  players: GameResultPlayerRecord[];
+  adjustments: GameResultAdjustmentRecord[];
+  format_roles: FormatRoleRecord[];
+  selectable_players: SelectablePlayerRecord[];
+  validation: ValidationSummary;
+  editable: boolean;
 };
 
 export type EventDayDetail = EventDaySummary & {
@@ -227,6 +318,17 @@ export type GameFormatUpdatePayload = {
   description?: string | null;
 };
 
+
+export class ApiRequestError extends Error {
+  detail: unknown;
+
+  constructor(message: string, detail: unknown) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.detail = detail;
+  }
+}
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
@@ -242,16 +344,30 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    let detail = "Request failed.";
+    let message = "Request failed.";
+    let detail: unknown = null;
     try {
-      const body = (await response.json()) as { detail?: string };
-      if (body.detail) {
-        detail = body.detail;
+      // Result-entry validation returns structured details, so callers keep the
+      // original payload for field-level feedback instead of flattening it.
+      const body = (await response.json()) as { detail?: unknown; message?: string };
+      detail = body.detail ?? body;
+      if (typeof body.detail === "string") {
+        message = body.detail;
+      } else if (
+        body.detail &&
+        typeof body.detail === "object" &&
+        "message" in body.detail &&
+        typeof body.detail.message === "string"
+      ) {
+        message = body.detail.message;
+      } else if (body.message) {
+        message = body.message;
       }
     } catch {
       detail = "Request failed.";
+      message = "Request failed.";
     }
-    throw new Error(detail);
+    throw new ApiRequestError(message, detail);
   }
 
   return (await response.json()) as T;
@@ -419,6 +535,36 @@ export function createGame(token: string, payload: GameCreatePayload): Promise<G
 
 export function getGame(token: string, gameId: number): Promise<GameDetail> {
   return request<GameDetail>(`/games/${gameId}`, withAuth(token));
+}
+
+
+export function getGameResultDraft(
+  token: string,
+  gameId: number,
+): Promise<GameResultDraftResponse> {
+  return request<GameResultDraftResponse>(`/games/${gameId}/result-draft`, withAuth(token));
+}
+
+
+export function saveGameResultDraft(
+  token: string,
+  gameId: number,
+  payload: GameResultDraftWritePayload,
+): Promise<GameResultDraftResponse> {
+  return request<GameResultDraftResponse>(`/games/${gameId}/result-draft`, withAuth(token, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  }));
+}
+
+
+export function submitGameResult(
+  token: string,
+  gameId: number,
+): Promise<GameResultDraftResponse> {
+  return request<GameResultDraftResponse>(`/games/${gameId}/submit-result`, withAuth(token, {
+    method: "POST",
+  }));
 }
 
 

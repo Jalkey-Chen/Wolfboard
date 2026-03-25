@@ -69,6 +69,12 @@ class Game(Base):
     judge = relationship("User", foreign_keys=[judge_user_id], back_populates="judged_games")
     submitter = relationship("User", foreign_keys=[submitted_by], back_populates="submitted_games")
     confirmer = relationship("User", foreign_keys=[confirmed_by], back_populates="confirmed_games")
+    players = relationship(
+        "GamePlayer",
+        back_populates="game",
+        cascade="all, delete-orphan",
+        order_by="GamePlayer.seat_number.asc()",
+    )
 
     @property
     def season_id(self) -> int | None:
@@ -107,3 +113,9 @@ class Game(Base):
         """Expose the assigned judge display name for summary responses."""
 
         return self.judge.display_name if self.judge is not None else ""
+
+    @property
+    def has_result_draft(self) -> bool:
+        """Expose whether any game-player rows currently exist for this game."""
+
+        return len(self.players) > 0

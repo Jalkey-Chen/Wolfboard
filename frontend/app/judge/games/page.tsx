@@ -29,7 +29,7 @@ const statusOptions: Array<GameStatus | "all"> = [
 
 
 export default function JudgeGamesPage() {
-  const { token, profile, isLoading, hasRole } = useAuthenticatedSession({ requiredRoles: ["judge", "admin"] });
+  const { token, profile, isLoading } = useAuthenticatedSession({ requiredRoles: ["judge", "admin"] });
   const [games, setGames] = useState<GameSummary[]>([]);
   const [statusFilter, setStatusFilter] = useState<GameStatus | "all">("all");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -89,30 +89,50 @@ export default function JudgeGamesPage() {
 
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
               <div className="grid gap-4">
-                {games.map((game) => (
-                  <Link
-                    key={game.id}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-5 transition hover:border-slate-300 hover:bg-white"
-                    href={`/games/${game.id}`}
-                  >
-                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                      <div>
-                        <h3 className="text-xl font-semibold text-ink">
-                          {game.event_day_title} · Table {game.table_number} / Game {game.game_number}
-                        </h3>
-                        <p className="mt-2 text-sm text-slate-600">
-                          {formatDate(game.event_day_date)} · {game.format_name}
-                        </p>
-                        <p className="mt-2 text-sm text-slate-600">
-                          Type: {game.game_type} · Status: {game.status}
-                        </p>
-                      </div>
-                      <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
-                        Result entry placeholder
+                {games.map((game) => {
+                  const resultHref = `/judge/games/${game.id}/result`;
+                  const actionLabel =
+                    game.status === "draft" || game.status === "in_progress"
+                      ? "Enter Result"
+                      : game.status === "submitted"
+                        ? "View Submitted Result"
+                        : "View Game";
+
+                  return (
+                    <div
+                      key={game.id}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 p-5"
+                    >
+                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                        <div>
+                          <h3 className="text-xl font-semibold text-ink">
+                            {game.event_day_title} · Table {game.table_number} / Game {game.game_number}
+                          </h3>
+                          <p className="mt-2 text-sm text-slate-600">
+                            {formatDate(game.event_day_date)} · {game.format_name}
+                          </p>
+                          <p className="mt-2 text-sm text-slate-600">
+                            Type: {game.game_type} · Status: {game.status}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-3">
+                          <Link
+                            className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
+                            href={`/games/${game.id}`}
+                          >
+                            Details
+                          </Link>
+                          <Link
+                            className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                            href={resultHref}
+                          >
+                            {actionLabel}
+                          </Link>
+                        </div>
                       </div>
                     </div>
-                  </Link>
-                ))}
+                  );
+                })}
 
                 {games.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-6 text-sm text-slate-600">

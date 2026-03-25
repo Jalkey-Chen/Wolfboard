@@ -14,16 +14,20 @@ import { useParams } from "next/navigation";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { formatDate, formatDateTime } from "@/lib/date";
-import { getGame, type GameDetail } from "@/lib/api";
+import { getGame, getGameResultDraft, type GameDetail, type GameResultDraftResponse } from "@/lib/api";
 import { useAuthenticatedSession } from "@/lib/use-authenticated-session";
 
 
 export default function GameDetailPage() {
   const params = useParams<{ id: string }>();
   const gameId = Number(params.id);
-  const { token, profile, isLoading, hasRole } = useAuthenticatedSession();
+  const { token, profile, isLoading } = useAuthenticatedSession();
   const [game, setGame] = useState<GameDetail | null>(null);
+  const [resultDraft, setResultDraft] = useState<GameResultDraftResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const userIsAdmin = profile?.roles.includes("admin") ?? false;
+  const userIsJudge = profile?.roles.includes("judge") ?? false;
 
   useEffect(() => {
     if (!token || !profile || Number.isNaN(gameId)) {
@@ -37,6 +41,25 @@ export default function GameDetailPage() {
       });
   }, [gameId, profile, token]);
 
+  useEffect(() => {
+    if (!token || !profile || !game) {
+      return;
+    }
+
+    const canOpenResultPage =
+      userIsAdmin || (userIsJudge && profile.user.id === game.judge_user_id);
+    if (!canOpenResultPage) {
+      setResultDraft(null);
+      return;
+    }
+
+    void getGameResultDraft(token, game.id)
+      .then((response) => setResultDraft(response))
+      .catch(() => {
+        setResultDraft(null);
+      });
+  }, [game, profile, token, userIsAdmin, userIsJudge]);
+
   if (isLoading) {
     return <PageLoading message="Loading game details..." />;
   }
@@ -45,19 +68,39 @@ export default function GameDetailPage() {
     return null;
   }
 
+  const canOpenResultPage =
+    game !== null && (userIsAdmin || (userIsJudge && profile.user.id === game.judge_user_id));
+  const canEditResult =
+    game !== null &&
+    userIsJudge &&
+    profile.user.id === game.judge_user_id &&
+    (game.status === "draft" || game.status === "in_progress");
+
   return (
     <SiteShell
       profile={profile}
       title={game ? `Table ${game.table_number} · Game ${game.game_number}` : "Game"}
       description={game ? `${game.season_name} · ${game.event_day_title}` : "Game setup detail."}
       actions={
-        game && hasRole("admin") ? (
-          <Link
-            className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-            href={`/admin/event-days/${game.event_day_id}/games`}
-          >
-            Manage Games
-          </Link>
+        game ? (
+          <div className="flex flex-wrap gap-3">
+            {canOpenResultPage ? (
+              <Link
+                className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                href={`/judge/games/${game.id}/result`}
+              >
+                {canEditResult ? "Enter Result" : "View Result"}
+              </Link>
+            ) : null}
+            {userIsAdmin ? (
+              <Link
+                className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
+                href={`/admin/event-days/${game.event_day_id}/games`}
+              >
+                Manage Games
+              </Link>
+            ) : null}
+          </div>
         ) : null
       }
     >
@@ -128,8 +171,46 @@ export default function GameDetailPage() {
               </div>
 
               <div className="mt-5 rounded-2xl border border-dashed border-slate-300 px-4 py-4 text-sm text-slate-600">
-                Milestone 4 will attach result-entry actions here or on a linked judge workflow page.
+                {canEditResult
+                  ? "This game is editable by the assigned judge. Use the result entry page to save a draft or submit the result."
+                  : game.status === "submitted"
+                    ? "This game has been submitted and is now read-only for the judge."
+                    : "No result entry actions are available for your current role on this game."}
               </div>
+            </section>
+
+            <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
+              <h2 className="text-2xl font-bold text-ink">Result Summary</h2>
+              {resultDraft && resultDraft.players.length > 0 ? (
+                <div className="mt-5 overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead>
+                      <tr className="text-left text-slate-500">
+                        <th className="px-3 py-3 font-semibold">Seat</th>
+                        <th className="px-3 py-3 font-semibold">Player</th>
+                        <th className="px-3 py-3 font-semibold">Role</th>
+                        <th className="px-3 py-3 font-semibold">Faction</th>
+                        <th className="px-3 py-3 font-semibold">Winner</th>
+                        <th className="px-3 py-3 font-semibold">Final</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {resultDraft.players.map((player) => (
+                        <tr key={player.id}>
+                          <td className="px-3 py-4 text-slate-700">{player.seat_number ?? "Not set"}</td>
+                          <td className="px-3 py-4 text-slate-700">{player.display_name || "Not selected"}</td>
+                          <td className="px-3 py-4 text-slate-700">{player.role_name ?? "Not set"}</td>
+                          <td className="px-3 py-4 text-slate-700">{player.faction ?? "Not set"}</td>
+                          <td className="px-3 py-4 text-slate-700">{player.is_winner === null ? "Not set" : player.is_winner ? "Win" : "Lose"}</td>
+                          <td className="px-3 py-4 font-semibold text-ink">{player.final_score}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="mt-4 text-sm text-slate-600">No result draft has been saved for this game yet.</p>
+              )}
             </section>
           </>
         ) : null}
