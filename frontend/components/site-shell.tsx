@@ -12,6 +12,7 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { useI18n } from "@/components/language-provider";
 import { LogoutButton } from "@/components/logout-button";
 import type { CurrentUserResponse } from "@/lib/api";
+import { getBadgeTextClass, getOverlineTextClass } from "@/lib/i18n";
 
 
 type SiteShellProps = {
@@ -34,12 +35,8 @@ export function SiteShell({
   const isAdmin = profile.roles.includes("admin");
   const isJudge = profile.roles.includes("judge");
   const canOpenJudgeQueue = isAdmin || isJudge;
-  const overlineClass = language === "zh"
-    ? "text-sm font-semibold text-accent"
-    : "text-sm font-semibold uppercase tracking-[0.3em] text-accent";
-  const roleBadgeClass = language === "zh"
-    ? "rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-gold"
-    : "rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.15em] text-gold";
+  const overlineClass = `${getOverlineTextClass(language)} text-accent`;
+  const roleBadgeClass = `rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-gold ${getBadgeTextClass(language)}`;
 
   return (
     <main className="min-h-screen px-6 py-8">

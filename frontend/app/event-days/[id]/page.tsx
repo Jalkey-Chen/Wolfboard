@@ -15,6 +15,7 @@ import { useI18n } from "@/components/language-provider";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { formatDate, formatDateTime } from "@/lib/date";
+import { getMetaLabelClass } from "@/lib/i18n";
 import { cancelRegistration, getEventDay, registerForEventDay, type EventDayDetail } from "@/lib/api";
 import { useAuthenticatedSession } from "@/lib/use-authenticated-session";
 
@@ -22,7 +23,7 @@ import { useAuthenticatedSession } from "@/lib/use-authenticated-session";
 export default function EventDayDetailPage() {
   const params = useParams<{ id: string }>();
   const eventDayId = Number(params.id);
-  const { t, enumLabel } = useI18n();
+  const { t, enumLabel, language } = useI18n();
   const { token, profile, isLoading, hasRole } = useAuthenticatedSession();
   const [eventDay, setEventDay] = useState<EventDayDetail | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -104,6 +105,7 @@ export default function EventDayDetailPage() {
     eventDay?.status === "open_for_registration" &&
     eventDay.viewer_registration !== null &&
     eventDay.viewer_registration.registration_status !== "cancelled";
+  const metaLabelClass = getMetaLabelClass(language);
 
   return (
     <SiteShell
@@ -131,25 +133,25 @@ export default function EventDayDetailPage() {
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.date")}</div>
+                  <div className={metaLabelClass}>{t("common.date")}</div>
                   <div className="mt-2 text-sm text-slate-700">{formatDate(eventDay.event_date)}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.venue")}</div>
+                  <div className={metaLabelClass}>{t("common.venue")}</div>
                   <div className="mt-2 text-sm text-slate-700">{eventDay.venue}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.category")}</div>
+                  <div className={metaLabelClass}>{t("common.category")}</div>
                   <div className="mt-2 text-sm text-slate-700">{enumLabel("eventDayCategory", eventDay.category)}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.status")}</div>
+                  <div className={metaLabelClass}>{t("common.status")}</div>
                   <div className="mt-2 text-sm text-slate-700">{enumLabel("eventDayStatus", eventDay.status)}</div>
                 </div>
               </div>
               <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.registrationWindow")}</div>
+                  <div className={metaLabelClass}>{t("common.registrationWindow")}</div>
                   <div className="mt-2 text-sm text-slate-700">
                     {t("common.windowRange", {
                       start: formatDateTime(eventDay.registration_open_at),
@@ -158,7 +160,7 @@ export default function EventDayDetailPage() {
                   </div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("eventDay.registeredPlayers")}</div>
+                  <div className={metaLabelClass}>{t("eventDay.registeredPlayers")}</div>
                   <div className="mt-2 text-sm text-slate-700">{eventDay.registration_count}</div>
                 </div>
               </div>
@@ -172,19 +174,19 @@ export default function EventDayDetailPage() {
               {eventDay.viewer_registration ? (
                 <div className="mt-5 grid gap-4 md:grid-cols-2">
                   <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                    <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("eventDay.registrationStatus")}</div>
+                    <div className={metaLabelClass}>{t("eventDay.registrationStatus")}</div>
                     <div className="mt-2 text-sm text-slate-700">{enumLabel("registrationStatus", eventDay.viewer_registration.registration_status)}</div>
                   </div>
                   <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                    <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("eventDay.checkInStatus")}</div>
+                    <div className={metaLabelClass}>{t("eventDay.checkInStatus")}</div>
                     <div className="mt-2 text-sm text-slate-700">{enumLabel("checkInStatus", eventDay.viewer_registration.check_in_status)}</div>
                   </div>
                   <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                    <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("eventDay.registrationType")}</div>
+                    <div className={metaLabelClass}>{t("eventDay.registrationType")}</div>
                     <div className="mt-2 text-sm text-slate-700">{enumLabel("registrationType", eventDay.viewer_registration.registration_type)}</div>
                   </div>
                   <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                    <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("eventDay.note")}</div>
+                    <div className={metaLabelClass}>{t("eventDay.note")}</div>
                     <div className="mt-2 text-sm text-slate-700">{eventDay.viewer_registration.note ?? t("common.none")}</div>
                   </div>
                 </div>

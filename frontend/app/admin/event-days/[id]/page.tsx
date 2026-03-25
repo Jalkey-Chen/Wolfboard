@@ -15,6 +15,7 @@ import { useI18n } from "@/components/language-provider";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { formatDateTime, toDateTimeLocalValue } from "@/lib/date";
+import { getMetaLabelClass } from "@/lib/i18n";
 import {
   getEventDay,
   updateEventDay,
@@ -39,7 +40,7 @@ const eventDayStatuses: EventDayStatus[] = [
 export default function AdminEventDayPage() {
   const params = useParams<{ id: string }>();
   const eventDayId = Number(params.id);
-  const { t, enumLabel } = useI18n();
+  const { t, enumLabel, language } = useI18n();
   const { token, profile, isLoading } = useAuthenticatedSession({ requiredRole: "admin" });
   const [eventDay, setEventDay] = useState<EventDayDetail | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -86,6 +87,8 @@ export default function AdminEventDayPage() {
   if (!profile || Number.isNaN(eventDayId)) {
     return null;
   }
+
+  const metaLabelClass = getMetaLabelClass(language);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -216,7 +219,7 @@ export default function AdminEventDayPage() {
             <h2 className="text-2xl font-bold text-ink">{t("common.preview")}</h2>
             <div className="mt-5 space-y-4 text-sm text-slate-700">
               <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.registrationWindow")}</div>
+                <div className={metaLabelClass}>{t("common.registrationWindow")}</div>
                 <div className="mt-2">
                   {t("common.windowRange", {
                     start: formatDateTime(eventDay.registration_open_at),
@@ -225,11 +228,11 @@ export default function AdminEventDayPage() {
                 </div>
               </div>
               <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("eventDay.registeredPlayers")}</div>
+                <div className={metaLabelClass}>{t("eventDay.registeredPlayers")}</div>
                 <div className="mt-2">{eventDay.registration_count}</div>
               </div>
               <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("eventDay.games")}</div>
+                <div className={metaLabelClass}>{t("eventDay.games")}</div>
                 <div className="mt-2">{eventDay.game_count}</div>
               </div>
             </div>

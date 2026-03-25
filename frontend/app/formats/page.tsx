@@ -14,7 +14,7 @@ import { useI18n } from "@/components/language-provider";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { getFormats, type GameFormatRecord } from "@/lib/api";
-import { translatePresetFormatDescription } from "@/lib/i18n";
+import { getMetaLabelClass, translatePresetFormatDescription } from "@/lib/i18n";
 import { useAuthenticatedSession } from "@/lib/use-authenticated-session";
 
 
@@ -44,9 +44,7 @@ export default function FormatsPage() {
     return null;
   }
 
-  const infoLabelClass = language === "zh"
-    ? "text-xs font-semibold text-slate-400"
-    : "text-xs uppercase tracking-[0.18em] text-slate-400";
+  const infoLabelClass = getMetaLabelClass(language);
   const statusBadgeClass = language === "zh"
     ? "inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-semibold"
     : "inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]";

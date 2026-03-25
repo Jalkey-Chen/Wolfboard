@@ -11,7 +11,7 @@ import { useI18n } from "@/components/language-provider";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { getFormat, updateFormat, type GameFormatDetail } from "@/lib/api";
-import { translatePresetFormatDescription } from "@/lib/i18n";
+import { getMetaLabelClass, translatePresetFormatDescription } from "@/lib/i18n";
 import { useAuthenticatedSession } from "@/lib/use-authenticated-session";
 
 
@@ -44,9 +44,7 @@ export default function FormatDetailPage() {
     return null;
   }
 
-  const infoLabelClass = language === "zh"
-    ? "text-xs font-semibold text-slate-400"
-    : "text-xs uppercase tracking-[0.18em] text-slate-400";
+  const infoLabelClass = getMetaLabelClass(language);
 
   async function handleToggleActive() {
     if (!token || !gameFormat) {

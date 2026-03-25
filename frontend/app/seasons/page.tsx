@@ -15,11 +15,12 @@ import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { formatDate } from "@/lib/date";
 import { getSeasons, type SeasonRecord } from "@/lib/api";
+import { getMetaLabelClass } from "@/lib/i18n";
 import { useAuthenticatedSession } from "@/lib/use-authenticated-session";
 
 
 export default function SeasonsPage() {
-  const { t, enumLabel } = useI18n();
+  const { t, enumLabel, language } = useI18n();
   const { token, profile, isLoading } = useAuthenticatedSession();
   const [seasons, setSeasons] = useState<SeasonRecord[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -46,6 +47,8 @@ export default function SeasonsPage() {
     return null;
   }
 
+  const metaLabelClass = getMetaLabelClass(language);
+
   return (
     <SiteShell
       profile={profile}
@@ -69,7 +72,7 @@ export default function SeasonsPage() {
               className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50 transition hover:border-slate-300 hover:shadow-xl"
               href={`/seasons/${season.id}`}
             >
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{enumLabel("seasonStatus", season.status)}</p>
+              <p className={metaLabelClass}>{enumLabel("seasonStatus", season.status)}</p>
               <h2 className="mt-3 text-2xl font-bold text-ink">{season.name}</h2>
               <p className="mt-3 text-sm leading-6 text-slate-600">{season.description ?? t("common.noDescription")}</p>
               <div className="mt-5 text-sm text-slate-600">

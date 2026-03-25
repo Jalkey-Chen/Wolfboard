@@ -8,6 +8,7 @@ import { useI18n } from "@/components/language-provider";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { formatDate, formatDateTime } from "@/lib/date";
+import { getMetaLabelClass } from "@/lib/i18n";
 import {
   ApiRequestError,
   getGameResultDraft,
@@ -118,7 +119,7 @@ function parseValidationFromError(error: unknown): ValidationSummary | null {
 export default function AdminGameRevisionPage() {
   const params = useParams<{ id: string }>();
   const gameId = Number(params.id);
-  const { t, enumLabel } = useI18n();
+  const { t, enumLabel, language } = useI18n();
   const { token, profile, isLoading } = useAuthenticatedSession({ requiredRole: "admin" });
   const [draft, setDraft] = useState<GameResultDraftResponse | null>(null);
   const [playerRows, setPlayerRows] = useState<EditableGameResultPlayer[]>([]);
@@ -176,6 +177,7 @@ export default function AdminGameRevisionPage() {
 
   const validation = remoteValidation ?? localValidation;
   const isReadOnly = !draft || !["submitted", "confirmed", "revised"].includes(draft.game.status);
+  const metaLabelClass = getMetaLabelClass(language);
 
   function resetValidationFeedback() {
     setErrorMessage(null);
@@ -267,39 +269,39 @@ export default function AdminGameRevisionPage() {
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.season")}</div>
+                  <div className={metaLabelClass}>{t("common.season")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{draft.game.season_name}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.eventDay")}</div>
+                  <div className={metaLabelClass}>{t("common.eventDay")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{draft.game.event_day_title}</div>
                   <div className="mt-1 text-xs text-slate-500">{formatDate(draft.game.event_day_date)}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.format")}</div>
+                  <div className={metaLabelClass}>{t("common.format")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{draft.game.format.format_name}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.judge")}</div>
+                  <div className={metaLabelClass}>{t("common.judge")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{draft.game.judge.display_name}</div>
                 </div>
               </div>
 
               <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("resultEntry.tableNumber")}</div>
+                  <div className={metaLabelClass}>{t("resultEntry.tableNumber")}</div>
                   <div className="mt-2 text-sm text-slate-700">{draft.game.table_number}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("resultEntry.gameNumber")}</div>
+                  <div className={metaLabelClass}>{t("resultEntry.gameNumber")}</div>
                   <div className="mt-2 text-sm text-slate-700">{draft.game.game_number}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.currentStatus")}</div>
+                  <div className={metaLabelClass}>{t("common.currentStatus")}</div>
                   <div className="mt-2 text-sm text-slate-700">{enumLabel("gameStatus", draft.game.status)}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("resultEntry.submittedAt")}</div>
+                  <div className={metaLabelClass}>{t("resultEntry.submittedAt")}</div>
                   <div className="mt-2 text-sm text-slate-700">{formatDateTime(draft.game.submitted_at)}</div>
                 </div>
               </div>

@@ -672,43 +672,43 @@ const enumTranslations: Record<EnumGroup, Record<string, Record<Language, string
 };
 
 const presetFormatDescriptions: Record<string, Record<Language, string>> = {
-  prophet_witch_hunter_idiot_mixed_blood: {
+  "yu-nv-lie-bai-hun": {
     zh: "标准十二人预女猎白混配置，适合正式赛事与常规积分局。",
     en: "Standard twelve-player format with prophet, witch, hunter, idiot, and mixed blood.",
   },
-  wolf_king_guard: {
+  "wolf-king-guard": {
     zh: "经典狼王守卫板型，白天压力和抗推博弈都比较稳定。",
     en: "Classic wolf-king plus guard configuration for official play.",
   },
-  wolf_beauty_knight: {
+  "wolf-beauty-knight": {
     zh: "狼美人与骑士并存的特殊板型，白天博弈更强、更容易形成对抗。",
     en: "Wolf beauty and knight variation with sharper daytime pressure.",
   },
-  mechanical_wolf_medium: {
+  "mecha-wolf-medium": {
     zh: "机械狼搭配通灵师的信息板型，适合偏信息量更高的对局节奏。",
     en: "Mechanical wolf paired with medium for a higher-information lineup.",
   },
-  nightmare_dreamweaver: {
+  "nightmare-dreamweaver": {
     zh: "梦魇与摄梦人构成的夜间交互板型，行动链条更丰富。",
     en: "Nightmare and dreamweaver variant with layered night actions.",
   },
-  all_in: {
+  "all-in": {
     zh: "高波动娱乐板型，角色分布更摇摆，适合活动局和趣味局。",
     en: "High-variance fun format with swingier role distribution.",
   },
-  treasure_raider_master: {
+  "treasure-raider-master": {
     zh: "盗宝大师加入后的特殊板型，更强调资源争夺和身份压力。",
     en: "Treasure-raider master format with loot-centric special role pressure.",
   },
-  masquerade_ball: {
+  "masquerade-ball": {
     zh: "假面舞会风格的娱乐板型，适合比赛日副桌或轻松局。",
     en: "Masquerade variant designed for event-day side tables and fun games.",
   },
-  neighbor_obedience: {
+  "follow-the-neighbor": {
     zh: "强调相邻关系与位置压力的特殊板型，白天站边会更微妙。",
     en: "Neighbor-driven variant that adds adjacency pressure to decisions.",
   },
-  fantasy_duel: {
+  "magic-duel": {
     zh: "魔幻对决板型强调双方镜像对抗与节奏拉扯，适合特色局。",
     en: "Fantasy duel format with mirror-like pressure on both factions.",
   },
@@ -791,4 +791,25 @@ export function translatePresetFormatDescription(
   }
 
   return fallback ?? translate(language, "formats.noDescription");
+}
+
+/** Choose eyebrow text styling that stays airy in English and compact in Chinese. */
+export function getOverlineTextClass(language: Language): string {
+  return language === "zh"
+    ? "text-sm font-semibold text-slate-400"
+    : "text-sm font-semibold uppercase tracking-[0.22em] text-slate-400";
+}
+
+/** Choose compact metadata label styling for cards, stats, and form summaries. */
+export function getMetaLabelClass(language: Language): string {
+  return language === "zh"
+    ? "text-xs font-semibold text-slate-400"
+    : "text-xs uppercase tracking-[0.18em] text-slate-400";
+}
+
+/** Choose role and status badge typography that avoids awkward Chinese letter spacing. */
+export function getBadgeTextClass(language: Language): string {
+  return language === "zh"
+    ? "text-xs font-semibold"
+    : "text-xs font-semibold uppercase tracking-[0.15em]";
 }

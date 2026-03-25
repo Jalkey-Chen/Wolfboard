@@ -13,13 +13,14 @@ import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { formatDate, formatDateTime } from "@/lib/date";
 import { getPlayerProfile, type PlayerProfileRecord } from "@/lib/api";
+import { getMetaLabelClass } from "@/lib/i18n";
 import { useAuthenticatedSession } from "@/lib/use-authenticated-session";
 
 
 export default function PlayerProfilePage() {
   const params = useParams<{ id: string }>();
   const playerId = Number(params.id);
-  const { t, enumLabel } = useI18n();
+  const { t, enumLabel, language } = useI18n();
   const { token, profile, isLoading } = useAuthenticatedSession();
   const [playerProfile, setPlayerProfile] = useState<PlayerProfileRecord | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -44,6 +45,8 @@ export default function PlayerProfilePage() {
     return null;
   }
 
+  const metaLabelClass = getMetaLabelClass(language);
+
   return (
     <SiteShell
       profile={profile}
@@ -58,16 +61,16 @@ export default function PlayerProfilePage() {
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.player")}</div>
+                  <div className={metaLabelClass}>{t("common.player")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{playerProfile.display_name}</div>
                   <div className="mt-1 text-xs text-slate-500">{playerProfile.username}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("players.officialTotalScore")}</div>
+                  <div className={metaLabelClass}>{t("players.officialTotalScore")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{playerProfile.total_score}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("players.officialGamesPlayed")}</div>
+                  <div className={metaLabelClass}>{t("players.officialGamesPlayed")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{playerProfile.games_played}</div>
                 </div>
               </div>

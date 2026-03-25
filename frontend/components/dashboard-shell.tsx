@@ -13,6 +13,7 @@ import { useI18n } from "@/components/language-provider";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { formatDate, formatDateTime } from "@/lib/date";
+import { getMetaLabelClass, getOverlineTextClass } from "@/lib/i18n";
 import {
   getEventDay,
   getSeason,
@@ -25,7 +26,7 @@ import { useAuthenticatedSession } from "@/lib/use-authenticated-session";
 
 
 export function DashboardShell() {
-  const { t, enumLabel } = useI18n();
+  const { t, enumLabel, language } = useI18n();
   const { token, profile, isLoading, errorMessage: sessionErrorMessage, hasRole } = useAuthenticatedSession();
   const [seasons, setSeasons] = useState<SeasonRecord[]>([]);
   const [activeSeason, setActiveSeason] = useState<SeasonRecord | null>(null);
@@ -94,6 +95,8 @@ export function DashboardShell() {
   const showPlayerSummary = hasRole("player") || hasRole("judge");
   const showAdminSummary = hasRole("admin");
   const showJudgeSummary = hasRole("judge");
+  const overlineClass = getOverlineTextClass(language);
+  const metaLabelClass = getMetaLabelClass(language);
 
   return (
     <SiteShell
@@ -108,7 +111,7 @@ export function DashboardShell() {
         ) : null}
 
         <article className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{t("dashboard.activeSeason")}</p>
+          <p className={overlineClass}>{t("dashboard.activeSeason")}</p>
           {activeSeason ? (
             <>
               <h2 className="mt-3 text-2xl font-bold text-ink">{activeSeason.name}</h2>
@@ -130,7 +133,7 @@ export function DashboardShell() {
         </article>
 
         <article className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{t("dashboard.recentEventDay")}</p>
+          <p className={overlineClass}>{t("dashboard.recentEventDay")}</p>
           {recentEventDay ? (
             <>
               <h2 className="mt-3 text-2xl font-bold text-ink">{recentEventDay.title}</h2>
@@ -151,7 +154,7 @@ export function DashboardShell() {
 
         {showPlayerSummary ? (
           <article className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{t("dashboard.registrationSummary")}</p>
+            <p className={overlineClass}>{t("dashboard.registrationSummary")}</p>
             <h2 className="mt-3 text-2xl font-bold text-ink">{t("dashboard.registrationTitle")}</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
               {t("dashboard.registrationDescription")}
@@ -166,7 +169,7 @@ export function DashboardShell() {
 
         {showJudgeSummary ? (
           <article className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{t("dashboard.judgeQueue")}</p>
+            <p className={overlineClass}>{t("dashboard.judgeQueue")}</p>
             <h2 className="mt-3 text-2xl font-bold text-ink">{t("dashboard.judgeTitle")}</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
               {t("dashboard.judgeDescription")}
@@ -181,7 +184,7 @@ export function DashboardShell() {
 
         {showAdminSummary ? (
           <article className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{t("dashboard.adminEntry")}</p>
+            <p className={overlineClass}>{t("dashboard.adminEntry")}</p>
             <h2 className="mt-3 text-2xl font-bold text-ink">{t("dashboard.adminTitle")}</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
               {t("dashboard.adminDescription")}
@@ -203,7 +206,7 @@ export function DashboardShell() {
         ) : null}
 
         <article className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{t("dashboard.formats")}</p>
+          <p className={overlineClass}>{t("dashboard.formats")}</p>
           <h2 className="mt-3 text-2xl font-bold text-ink">{t("dashboard.formatsTitle")}</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
             {t("dashboard.formatsDescription")}
@@ -216,7 +219,7 @@ export function DashboardShell() {
         </article>
 
         <article className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50 lg:col-span-2 xl:col-span-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{t("dashboard.currentSeasons")}</p>
+          <p className={overlineClass}>{t("dashboard.currentSeasons")}</p>
           <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {seasons.map((season) => (
               <Link
@@ -231,7 +234,7 @@ export function DashboardShell() {
                     end: formatDate(season.end_date),
                   })}
                 </div>
-                <div className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-400">{enumLabel("seasonStatus", season.status)}</div>
+                <div className={`mt-2 ${metaLabelClass}`}>{enumLabel("seasonStatus", season.status)}</div>
               </Link>
             ))}
           </div>
@@ -241,7 +244,7 @@ export function DashboardShell() {
           <article className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50 lg:col-span-2 xl:col-span-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{t("dashboard.recentGames")}</p>
+                <p className={overlineClass}>{t("dashboard.recentGames")}</p>
                 <h2 className="mt-3 text-2xl font-bold text-ink">{recentEventDayDetail.title}</h2>
               </div>
               <Link className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200" href={`/event-days/${recentEventDayDetail.id}`}>
@@ -260,7 +263,7 @@ export function DashboardShell() {
                     {t("dashboard.tableGame", { table: game.table_number, game: game.game_number })}
                   </div>
                   <div className="mt-1 text-sm text-slate-600">{game.format_name}</div>
-                  <div className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-400">
+                  <div className={`mt-2 ${metaLabelClass}`}>
                     {enumLabel("gameType", game.game_type)} · {enumLabel("gameStatus", game.status)}
                   </div>
                 </Link>

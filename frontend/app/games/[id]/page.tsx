@@ -15,6 +15,7 @@ import { useI18n } from "@/components/language-provider";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { formatDate, formatDateTime } from "@/lib/date";
+import { getMetaLabelClass } from "@/lib/i18n";
 import { getGame, getGameResultDraft, type GameDetail, type GameResultDraftResponse } from "@/lib/api";
 import { useAuthenticatedSession } from "@/lib/use-authenticated-session";
 
@@ -22,7 +23,7 @@ import { useAuthenticatedSession } from "@/lib/use-authenticated-session";
 export default function GameDetailPage() {
   const params = useParams<{ id: string }>();
   const gameId = Number(params.id);
-  const { t, enumLabel } = useI18n();
+  const { t, enumLabel, language } = useI18n();
   const { token, profile, isLoading } = useAuthenticatedSession();
   const [game, setGame] = useState<GameDetail | null>(null);
   const [resultDraft, setResultDraft] = useState<GameResultDraftResponse | null>(null);
@@ -81,6 +82,7 @@ export default function GameDetailPage() {
     profile.user.id === game.judge_user_id &&
     (game.status === "draft" || game.status === "in_progress");
   const canReviewResult = game !== null && userIsAdmin && game.status === "submitted";
+  const metaLabelClass = getMetaLabelClass(language);
 
   return (
     <SiteShell
@@ -126,39 +128,39 @@ export default function GameDetailPage() {
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.season")}</div>
+                  <div className={metaLabelClass}>{t("common.season")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{game.season_name}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.eventDay")}</div>
+                  <div className={metaLabelClass}>{t("common.eventDay")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{game.event_day_title}</div>
                   <div className="mt-1 text-xs text-slate-500">{formatDate(game.event_day_date)}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.format")}</div>
+                  <div className={metaLabelClass}>{t("common.format")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{game.format.format_name}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.judge")}</div>
+                  <div className={metaLabelClass}>{t("common.judge")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{game.judge.display_name}</div>
                 </div>
               </div>
 
               <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.table")}</div>
+                  <div className={metaLabelClass}>{t("common.table")}</div>
                   <div className="mt-2 text-sm text-slate-700">{game.table_number}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.gameNumber")}</div>
+                  <div className={metaLabelClass}>{t("common.gameNumber")}</div>
                   <div className="mt-2 text-sm text-slate-700">{game.game_number}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.gameType")}</div>
+                  <div className={metaLabelClass}>{t("common.gameType")}</div>
                   <div className="mt-2 text-sm text-slate-700">{enumLabel("gameType", game.game_type)}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.status")}</div>
+                  <div className={metaLabelClass}>{t("common.status")}</div>
                   <div className="mt-2 text-sm text-slate-700">{enumLabel("gameStatus", game.status)}</div>
                 </div>
               </div>
@@ -168,15 +170,15 @@ export default function GameDetailPage() {
               <h2 className="text-2xl font-bold text-ink">{t("games.timingAndNotes")}</h2>
               <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.venue")}</div>
+                  <div className={metaLabelClass}>{t("common.venue")}</div>
                   <div className="mt-2 text-sm text-slate-700">{game.event_day_venue}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("games.startedAt")}</div>
+                  <div className={metaLabelClass}>{t("games.startedAt")}</div>
                   <div className="mt-2 text-sm text-slate-700">{formatDateTime(game.started_at)}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("games.endedAt")}</div>
+                  <div className={metaLabelClass}>{t("games.endedAt")}</div>
                   <div className="mt-2 text-sm text-slate-700">{formatDateTime(game.ended_at)}</div>
                 </div>
               </div>

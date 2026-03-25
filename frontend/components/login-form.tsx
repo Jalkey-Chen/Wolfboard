@@ -14,6 +14,7 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { useI18n } from "@/components/language-provider";
 import { login } from "@/lib/api";
 import { getStoredAccessToken, setStoredAccessToken } from "@/lib/auth";
+import { getOverlineTextClass } from "@/lib/i18n";
 
 
 export function LoginForm() {
@@ -23,12 +24,8 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const heroOverlineClass = language === "zh"
-    ? "text-sm font-semibold text-amber-300"
-    : "text-sm font-semibold uppercase tracking-[0.3em] text-amber-300";
-  const formOverlineClass = language === "zh"
-    ? "text-sm font-semibold text-accent"
-    : "text-sm font-semibold uppercase tracking-[0.28em] text-accent";
+  const heroOverlineClass = `${getOverlineTextClass(language)} text-amber-300`;
+  const formOverlineClass = `${getOverlineTextClass(language)} text-accent`;
 
   useEffect(() => {
     if (getStoredAccessToken()) {

@@ -15,6 +15,7 @@ import { useI18n } from "@/components/language-provider";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { formatDate, formatDateTime } from "@/lib/date";
+import { getMetaLabelClass } from "@/lib/i18n";
 import {
   createEventDay,
   getSeason,
@@ -39,7 +40,7 @@ const eventDayStatuses: EventDayStatus[] = [
 export default function SeasonDetailPage() {
   const params = useParams<{ id: string }>();
   const seasonId = Number(params.id);
-  const { t, enumLabel } = useI18n();
+  const { t, enumLabel, language } = useI18n();
   const { token, profile, isLoading, hasRole } = useAuthenticatedSession();
   const [season, setSeason] = useState<SeasonDetail | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -77,6 +78,8 @@ export default function SeasonDetailPage() {
   if (!profile || Number.isNaN(seasonId)) {
     return null;
   }
+
+  const metaLabelClass = getMetaLabelClass(language);
 
   async function handleCreateEventDay(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -150,7 +153,7 @@ export default function SeasonDetailPage() {
             <h2 className="text-2xl font-bold text-ink">{t("seasons.overview")}</h2>
             <div className="mt-4 grid gap-4 md:grid-cols-3">
               <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.date")}</div>
+                <div className={metaLabelClass}>{t("common.date")}</div>
                 <div className="mt-2 text-sm text-slate-700">
                   {t("common.datesRange", {
                     start: formatDate(season.start_date),
@@ -159,11 +162,11 @@ export default function SeasonDetailPage() {
                 </div>
               </div>
               <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("common.status")}</div>
+                <div className={metaLabelClass}>{t("common.status")}</div>
                 <div className="mt-2 text-sm text-slate-700">{enumLabel("seasonStatus", season.status)}</div>
               </div>
               <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("seasons.eventDaysCount")}</div>
+                <div className={metaLabelClass}>{t("seasons.eventDaysCount")}</div>
                 <div className="mt-2 text-sm text-slate-700">{season.event_days.length}</div>
               </div>
             </div>
