@@ -54,26 +54,26 @@ ROLE_SEED = [
 USER_SEED = [
     {
         "username": "admin_user",
-        "display_name": "Admin User",
+        "display_name": "管理员示例账号",
         "email": "admin@example.com",
         "roles": ["admin", "judge", "player"],
     },
     {
         "username": "judge_user",
-        "display_name": "Judge User",
+        "display_name": "主持人示例账号",
         "email": "judge@example.com",
         "roles": ["judge", "player"],
     },
     {
         "username": "player_user",
-        "display_name": "Player User",
+        "display_name": "玩家示例账号",
         "email": "player@example.com",
         "roles": ["player"],
     },
 ] + [
     {
         "username": f"sample_player_{index:02d}",
-        "display_name": f"Sample Player {index:02d}",
+        "display_name": f"示例玩家{index:02d}",
         "email": f"sample_player_{index:02d}@example.com",
         "roles": ["player"],
     }
@@ -81,10 +81,13 @@ USER_SEED = [
 ]
 
 DEFAULT_PASSWORD = "password123"
-SEASON_NAME = "S1 Trial Season"
-OPEN_EVENT_DAY_TITLE = "2026-04-05 Official Match Day"
-CLOSED_EVENT_DAY_TITLE = "2026-03-29 Community Match Day"
-SEEDED_GAME_NOTE_PREFIX = "Seeded sample game for Milestone 3"
+SEASON_NAME = "S1 试验赛季"
+LEGACY_SEASON_NAMES = ("S1 Trial Season",)
+OPEN_EVENT_DAY_TITLE = "2026-04-05 正赛日"
+CLOSED_EVENT_DAY_TITLE = "2026-03-29 社群比赛日"
+LEGACY_OPEN_EVENT_DAY_TITLES = ("2026-04-05 Official Match Day",)
+LEGACY_CLOSED_EVENT_DAY_TITLES = ("2026-03-29 Community Match Day",)
+SEEDED_GAME_NOTE_PREFIX = "Milestone 3 示例对局"
 
 PRESET_FORMATS = [
     {
@@ -305,6 +308,9 @@ def seed_users(roles_by_key: dict[str, Role]) -> None:
                 )
                 db.add(user)
                 db.flush()
+            else:
+                user.display_name = user_payload["display_name"]
+                user.email = user_payload["email"]
 
             existing_role_ids = {
                 user_role.role_id
@@ -335,11 +341,15 @@ def seed_seasons_and_event_days() -> None:
         if admin_user is None:
             raise RuntimeError("The admin_user seed must exist before seeding seasons.")
 
-        season = db.scalar(select(Season).where(Season.name == SEASON_NAME))
+        matching_seasons = db.scalars(
+            select(Season).where(Season.name.in_((SEASON_NAME, *LEGACY_SEASON_NAMES)))
+        ).all()
+        sorted_matching_seasons = sorted(matching_seasons, key=lambda row: row.id)
+        season = sorted_matching_seasons[0] if sorted_matching_seasons else None
         if season is None:
             season = Season(
                 name=SEASON_NAME,
-                description="Sample season seeded for Milestone 2 local development.",
+                description="用于本地开发的示例赛季数据。",
                 start_date=date(2026, 3, 1),
                 end_date=date(2026, 5, 31),
                 status=SeasonStatus.ACTIVE,
@@ -348,22 +358,37 @@ def seed_seasons_and_event_days() -> None:
             db.add(season)
             db.flush()
         else:
-            season.description = "Sample season seeded for Milestone 2 local development."
+            season.name = SEASON_NAME
+            season.description = "用于本地开发的示例赛季数据。"
             season.start_date = date(2026, 3, 1)
             season.end_date = date(2026, 5, 31)
             season.status = SeasonStatus.ACTIVE
 
-        open_event_day = db.scalar(
-            select(EventDay).where(EventDay.season_id == season.id, EventDay.title == OPEN_EVENT_DAY_TITLE)
-        )
+        def delete_duplicate_event_day(event_day: EventDay) -> None:
+            for registration in db.scalars(
+                select(Registration).where(Registration.event_day_id == event_day.id)
+            ).all():
+                db.delete(registration)
+            for game in db.scalars(select(Game).where(Game.event_day_id == event_day.id)).all():
+                db.delete(game)
+            db.delete(event_day)
+
+        open_candidates = db.scalars(
+            select(EventDay).where(
+                EventDay.season_id.in_([row.id for row in matching_seasons] or [season.id]),
+                EventDay.title.in_((OPEN_EVENT_DAY_TITLE, *LEGACY_OPEN_EVENT_DAY_TITLES)),
+            )
+        ).all()
+        open_candidates = sorted(open_candidates, key=lambda row: row.id)
+        open_event_day = open_candidates[0] if open_candidates else None
         if open_event_day is None:
             open_event_day = EventDay(
                 season_id=season.id,
                 title=OPEN_EVENT_DAY_TITLE,
                 event_date=date(2026, 4, 5),
-                venue="Windy City Clubhouse",
+                venue="风城俱乐部",
                 category=EventDayCategory.OFFICIAL,
-                notes="Open registration sample event day.",
+                notes="用于演示开放报名流程的示例比赛日。",
                 registration_open_at=datetime.now() - timedelta(days=2),
                 registration_close_at=datetime.now() + timedelta(days=5),
                 status=EventDayStatus.OPEN_FOR_REGISTRATION,
@@ -371,25 +396,35 @@ def seed_seasons_and_event_days() -> None:
             )
             db.add(open_event_day)
         else:
+            open_event_day.season_id = season.id
+            open_event_day.title = OPEN_EVENT_DAY_TITLE
             open_event_day.event_date = date(2026, 4, 5)
-            open_event_day.venue = "Windy City Clubhouse"
+            open_event_day.venue = "风城俱乐部"
             open_event_day.category = EventDayCategory.OFFICIAL
-            open_event_day.notes = "Open registration sample event day."
+            open_event_day.notes = "用于演示开放报名流程的示例比赛日。"
             open_event_day.registration_open_at = datetime.now() - timedelta(days=2)
             open_event_day.registration_close_at = datetime.now() + timedelta(days=5)
             open_event_day.status = EventDayStatus.OPEN_FOR_REGISTRATION
 
-        closed_event_day = db.scalar(
-            select(EventDay).where(EventDay.season_id == season.id, EventDay.title == CLOSED_EVENT_DAY_TITLE)
-        )
+        for duplicate_event_day in open_candidates[1:]:
+            delete_duplicate_event_day(duplicate_event_day)
+
+        closed_candidates = db.scalars(
+            select(EventDay).where(
+                EventDay.season_id.in_([row.id for row in matching_seasons] or [season.id]),
+                EventDay.title.in_((CLOSED_EVENT_DAY_TITLE, *LEGACY_CLOSED_EVENT_DAY_TITLES)),
+            )
+        ).all()
+        closed_candidates = sorted(closed_candidates, key=lambda row: row.id)
+        closed_event_day = closed_candidates[0] if closed_candidates else None
         if closed_event_day is None:
             closed_event_day = EventDay(
                 season_id=season.id,
                 title=CLOSED_EVENT_DAY_TITLE,
                 event_date=date(2026, 3, 29),
-                venue="Downtown Tournament Hall",
+                venue="市中心赛事馆",
                 category=EventDayCategory.MIXED,
-                notes="Closed registration sample event day.",
+                notes="用于演示报名关闭与签到管理的示例比赛日。",
                 registration_open_at=datetime(2026, 3, 20, 12, 0, 0),
                 registration_close_at=datetime(2026, 3, 27, 23, 0, 0),
                 status=EventDayStatus.REGISTRATION_CLOSED,
@@ -397,13 +432,21 @@ def seed_seasons_and_event_days() -> None:
             )
             db.add(closed_event_day)
         else:
+            closed_event_day.season_id = season.id
+            closed_event_day.title = CLOSED_EVENT_DAY_TITLE
             closed_event_day.event_date = date(2026, 3, 29)
-            closed_event_day.venue = "Downtown Tournament Hall"
+            closed_event_day.venue = "市中心赛事馆"
             closed_event_day.category = EventDayCategory.MIXED
-            closed_event_day.notes = "Closed registration sample event day."
+            closed_event_day.notes = "用于演示报名关闭与签到管理的示例比赛日。"
             closed_event_day.registration_open_at = datetime(2026, 3, 20, 12, 0, 0)
             closed_event_day.registration_close_at = datetime(2026, 3, 27, 23, 0, 0)
             closed_event_day.status = EventDayStatus.REGISTRATION_CLOSED
+
+        for duplicate_event_day in closed_candidates[1:]:
+            delete_duplicate_event_day(duplicate_event_day)
+
+        for duplicate_season in sorted_matching_seasons[1:]:
+            db.delete(duplicate_season)
 
         db.commit()
 
@@ -609,7 +652,7 @@ def seed_games() -> None:
                 "judge_username": "judge_user",
                 "game_type": GameType.OFFICIAL,
                 "status": GameStatus.DRAFT,
-                "notes": f"{SEEDED_GAME_NOTE_PREFIX}: official round 1.",
+                "notes": f"{SEEDED_GAME_NOTE_PREFIX}：正式局第 1 轮。",
             },
             {
                 "event_title": OPEN_EVENT_DAY_TITLE,
@@ -619,7 +662,7 @@ def seed_games() -> None:
                 "judge_username": "admin_user",
                 "game_type": GameType.OFFICIAL,
                 "status": GameStatus.DRAFT,
-                "notes": f"{SEEDED_GAME_NOTE_PREFIX}: official round 2.",
+                "notes": f"{SEEDED_GAME_NOTE_PREFIX}：正式局第 2 轮。",
             },
             {
                 "event_title": OPEN_EVENT_DAY_TITLE,
@@ -629,7 +672,7 @@ def seed_games() -> None:
                 "judge_username": "judge_user",
                 "game_type": GameType.OFFICIAL,
                 "status": GameStatus.IN_PROGRESS,
-                "notes": f"{SEEDED_GAME_NOTE_PREFIX}: official round 3.",
+                "notes": f"{SEEDED_GAME_NOTE_PREFIX}：正式局第 3 轮。",
             },
             {
                 "event_title": CLOSED_EVENT_DAY_TITLE,
@@ -639,7 +682,7 @@ def seed_games() -> None:
                 "judge_username": "admin_user",
                 "game_type": GameType.FUN,
                 "status": GameStatus.CONFIRMED,
-                "notes": f"{SEEDED_GAME_NOTE_PREFIX}: fun side table.",
+                "notes": f"{SEEDED_GAME_NOTE_PREFIX}：娱乐副桌。",
             },
         ]
 
