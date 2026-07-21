@@ -5,13 +5,8 @@ from pathlib import Path
 from alembic import command
 from alembic.config import Config
 import pytest
-from sqlalchemy import Engine, inspect
+from sqlalchemy import Engine, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
-
-from app.core.enums import ScoreLogEffectiveStatus, ScoreLogSourceType
-from app.models.score_log import ScoreLog
-from tests.integration.result_support import create_result_scenario
-
 
 pytestmark = pytest.mark.integration
 INDEX_NAME = "uq_score_logs_effective_game_user_source"
@@ -43,16 +38,28 @@ def test_migration_0006_round_trip_accepts_existing_legal_data(
         assert INDEX_NAME not in _score_log_index_names(test_engine)
 
         with test_session_factory() as session:
-            scenario = create_result_scenario(session)
-            session.add(
-                ScoreLog(
-                    user_id=scenario.player_one_id,
-                    game_id=scenario.game_id,
-                    source_type=ScoreLogSourceType.GAME_RESULT,
-                    delta=1.0,
-                    balance_after=1.0,
-                    effective_status=ScoreLogEffectiveStatus.EFFECTIVE,
-                    note="Legal pre-migration row",
+            session.execute(
+                text(
+                    """
+                    INSERT INTO users (id, username, display_name, password_hash)
+                    VALUES (1, 'migration-admin', 'Migration Admin', 'unused'),
+                           (2, 'migration-judge', 'Migration Judge', 'unused'),
+                           (3, 'migration-player', 'Migration Player', 'unused');
+                    INSERT INTO seasons (id, name, start_date, end_date, created_by)
+                    VALUES (1, 'Migration Season', '2026-01-01', '2026-12-31', 1);
+                    INSERT INTO event_days (id, season_id, title, event_date, venue, created_by)
+                    VALUES (1, 1, 'Migration Day', '2026-06-01', 'Migration Venue', 1);
+                    INSERT INTO game_formats (id, format_name, format_key, player_count)
+                    VALUES (1, 'Migration Format', 'migration-format', 2);
+                    INSERT INTO games (
+                        id, event_day_id, game_number, table_number, format_id,
+                        judge_user_id, game_type, status
+                    ) VALUES (1, 1, 1, 1, 1, 2, 'OFFICIAL', 'DRAFT');
+                    INSERT INTO score_logs (
+                        id, user_id, game_id, source_type, delta, balance_after,
+                        effective_status, note
+                    ) VALUES (1, 3, 1, 'GAME_RESULT', 1, 1, 'EFFECTIVE', 'Legal pre-migration row');
+                    """
                 )
             )
             session.commit()

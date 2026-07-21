@@ -6,7 +6,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.enums import (
-    GameStatus,
+    GameResultStatus,
+    GamePlayStatus,
     GameType,
     ScoreLogEffectiveStatus,
     ScoreLogSourceType,
@@ -16,13 +17,21 @@ from app.models.game import Game
 from app.models.score_log import ScoreLog
 
 
-OFFICIAL_STANDING_GAME_STATUSES = frozenset({GameStatus.CONFIRMED, GameStatus.REVISED})
+OFFICIAL_STANDING_RESULT_STATUSES = frozenset({GameResultStatus.CONFIRMED, GameResultStatus.REVISED})
 
 
-def game_affects_official_standings(game_type: GameType, game_status: GameStatus) -> bool:
+def game_affects_official_standings(
+    game_type: GameType,
+    play_status: GamePlayStatus,
+    result_status: GameResultStatus,
+) -> bool:
     """Return whether a game's effective logs contribute to formal standings."""
 
-    return game_type == GameType.OFFICIAL and game_status in OFFICIAL_STANDING_GAME_STATUSES
+    return (
+        game_type == GameType.OFFICIAL
+        and play_status == GamePlayStatus.ENDED
+        and result_status in OFFICIAL_STANDING_RESULT_STATUSES
+    )
 
 
 def official_score_log_filters():
@@ -30,7 +39,8 @@ def official_score_log_filters():
 
     return (
         Game.game_type == GameType.OFFICIAL,
-        Game.status.in_(OFFICIAL_STANDING_GAME_STATUSES),
+        Game.play_status == GamePlayStatus.ENDED,
+        Game.result_status.in_(OFFICIAL_STANDING_RESULT_STATUSES),
         ScoreLog.effective_status == ScoreLogEffectiveStatus.EFFECTIVE,
     )
 
@@ -94,7 +104,7 @@ def recalculate_season_balances(db: Session, season_id: int | None, *, user_ids:
         return
 
     statement = (
-        select(ScoreLog, Game.game_type, Game.status)
+        select(ScoreLog, Game.game_type, Game.play_status, Game.result_status)
         .join(ScoreLog.game)
         .join(Game.event_day)
         .where(
@@ -114,8 +124,8 @@ def recalculate_season_balances(db: Session, season_id: int | None, *, user_ids:
         statement = statement.where(ScoreLog.user_id.in_(user_ids))
 
     balances: dict[int, float] = defaultdict(float)
-    for score_log, game_type, game_status in db.execute(statement):
-        if game_affects_official_standings(game_type, game_status):
+    for score_log, game_type, play_status, result_status in db.execute(statement):
+        if game_affects_official_standings(game_type, play_status, result_status):
             balances[score_log.user_id] += score_log.delta
         score_log.balance_after = balances[score_log.user_id]
         db.add(score_log)

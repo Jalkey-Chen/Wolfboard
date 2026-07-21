@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlalchemy import DateTime, Enum as SqlEnum, ForeignKey, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.enums import GameStatus, GameType
+from app.core.enums import GamePlayStatus, GameResultStatus, GameType
 from app.db.base_class import Base
 
 
@@ -39,10 +39,26 @@ class Game(Base):
         server_default=GameType.OFFICIAL.value,
         index=True,
     )
-    status: Mapped[GameStatus] = mapped_column(
-        SqlEnum(GameStatus, name="game_status", native_enum=False),
-        default=GameStatus.DRAFT,
-        server_default=GameStatus.DRAFT.value,
+    play_status: Mapped[GamePlayStatus] = mapped_column(
+        SqlEnum(
+            GamePlayStatus,
+            name="game_play_status",
+            native_enum=False,
+            values_callable=lambda enum: [item.value for item in enum],
+        ),
+        default=GamePlayStatus.SCHEDULED,
+        server_default=GamePlayStatus.SCHEDULED.value,
+        index=True,
+    )
+    result_status: Mapped[GameResultStatus] = mapped_column(
+        SqlEnum(
+            GameResultStatus,
+            name="game_result_status",
+            native_enum=False,
+            values_callable=lambda enum: [item.value for item in enum],
+        ),
+        default=GameResultStatus.EMPTY,
+        server_default=GameResultStatus.EMPTY.value,
         index=True,
     )
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -51,6 +67,9 @@ class Game(Base):
     submitted_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     confirmed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancelled_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    cancellation_reason: Mapped[str | None] = mapped_column(Text(), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text(), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -69,6 +88,7 @@ class Game(Base):
     judge = relationship("User", foreign_keys=[judge_user_id], back_populates="judged_games")
     submitter = relationship("User", foreign_keys=[submitted_by], back_populates="submitted_games")
     confirmer = relationship("User", foreign_keys=[confirmed_by], back_populates="confirmed_games")
+    canceller = relationship("User", foreign_keys=[cancelled_by], back_populates="cancelled_games")
     participants = relationship(
         "GameParticipant",
         back_populates="game",

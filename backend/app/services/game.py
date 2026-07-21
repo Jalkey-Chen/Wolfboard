@@ -10,7 +10,7 @@ from app.models.game import Game
 from app.models.game_format import GameFormat
 from app.models.user import User
 from app.models.user_role import UserRole
-from app.core.enums import GameStatus
+from app.core.enums import GamePlayStatus, GameResultStatus
 from app.schemas.game import GameCreate, GameUpdate
 
 
@@ -36,7 +36,8 @@ def list_games_for_event_day(db: Session, event_day_id: int) -> list[Game]:
 def list_games_for_judge(
     db: Session,
     judge_user_id: int,
-    status_filter: GameStatus | None = None,
+    play_status_filter: GamePlayStatus | None = None,
+    result_status_filter: GameResultStatus | None = None,
 ) -> list[Game]:
     """Return games assigned to a judge user, optionally filtered by status."""
 
@@ -46,8 +47,10 @@ def list_games_for_judge(
         .where(Game.judge_user_id == judge_user_id)
         .order_by(Game.updated_at.desc(), Game.id.desc())
     )
-    if status_filter is not None:
-        statement = statement.where(Game.status == status_filter)
+    if play_status_filter is not None:
+        statement = statement.where(Game.play_status == play_status_filter)
+    if result_status_filter is not None:
+        statement = statement.where(Game.result_status == result_status_filter)
     return list(db.scalars(statement).all())
 
 
@@ -134,10 +137,9 @@ def create_game(db: Session, payload: GameCreate) -> Game:
         format_id=payload.format_id,
         judge_user_id=payload.judge_user_id,
         game_type=payload.game_type,
-        status=GameStatus.DRAFT,
+        play_status=GamePlayStatus.SCHEDULED,
+        result_status=GameResultStatus.EMPTY,
         notes=payload.notes,
-        started_at=payload.started_at,
-        ended_at=payload.ended_at,
     )
     return persist_game(db, game)
 
@@ -145,7 +147,19 @@ def create_game(db: Session, payload: GameCreate) -> Game:
 def update_game(db: Session, game: Game, payload: GameUpdate) -> Game:
     """Apply an admin-managed patch to a game's setup fields."""
 
+    changes = payload.model_dump(exclude_unset=True)
+    if game.play_status == GamePlayStatus.CANCELLED:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cancelled games are read-only.")
+    frozen_fields = {"game_number", "format_id", "game_type"} & changes.keys()
+    if frozen_fields and (
+        game.play_status != GamePlayStatus.SCHEDULED
+        or game.result_status != GameResultStatus.EMPTY
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Game number, format, and game type are frozen after play or result entry begins.",
+        )
     validate_references(db, payload, event_day_id=game.event_day_id)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    for field, value in changes.items():
         setattr(game, field, value)
     return persist_game(db, game)

@@ -8,7 +8,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.enums import (
-    GameStatus,
+    GamePlayStatus,
+    GameResultStatus,
     GameType,
     ResultConfirmationStatus,
     ScoreLogEffectiveStatus,
@@ -62,7 +63,8 @@ def test_result_draft_permissions_persistence_and_page_payload(
     )
     assert save_response.status_code == 200
     saved = save_response.json()
-    assert saved["game"]["status"] == GameStatus.IN_PROGRESS.value
+    assert saved["game"]["play_status"] == GamePlayStatus.IN_PROGRESS.value
+    assert saved["game"]["result_status"] == GameResultStatus.DRAFT.value
     assert saved["editable"] is True
 
     restored_response = api_client.get(endpoint, headers=scenario.headers_for(scenario.judge_id))
@@ -149,12 +151,13 @@ def test_submit_validates_draft_records_actor_and_rejects_repetition(
     )
     assert submitted.status_code == 200
     body = submitted.json()["game"]
-    assert body["status"] == GameStatus.SUBMITTED.value
+    assert body["play_status"] == GamePlayStatus.ENDED.value
+    assert body["result_status"] == GameResultStatus.SUBMITTED.value
     assert body["submitted_by"] == scenario.judge_id
     assert datetime.fromisoformat(body["submitted_at"]).tzinfo is not None
 
     repeated = api_client.post(submit_endpoint, headers=scenario.headers_for(scenario.judge_id))
-    assert repeated.status_code == 400
+    assert repeated.status_code == 409
 
 
 def test_reject_is_admin_only_and_writes_review_history_and_audit(
@@ -184,7 +187,8 @@ def test_reject_is_admin_only_and_writes_review_history_and_audit(
         headers=scenario.headers_for(scenario.admin_id),
     )
     assert rejected.status_code == 200
-    assert rejected.json()["game"]["status"] == GameStatus.DRAFT.value
+    assert rejected.json()["game"]["play_status"] == GamePlayStatus.ENDED.value
+    assert rejected.json()["game"]["result_status"] == GameResultStatus.REJECTED.value
 
     db_session.expire_all()
     game = db_session.get(Game, scenario.game_id)
@@ -192,25 +196,35 @@ def test_reject_is_admin_only_and_writes_review_history_and_audit(
         select(ResultConfirmation).where(ResultConfirmation.game_id == scenario.game_id)
     )
     history = db_session.scalar(
-        select(GameStatusHistory).where(GameStatusHistory.game_id == scenario.game_id)
+        select(GameStatusHistory).where(
+            GameStatusHistory.game_id == scenario.game_id,
+            GameStatusHistory.transition_key == "reject_result",
+        )
     )
     audit = db_session.scalar(
-        select(AuditLog).where(AuditLog.entity_id == scenario.game_id)
+        select(AuditLog).where(
+            AuditLog.entity_id == scenario.game_id,
+            AuditLog.action_type == "reject",
+        )
     )
-    assert game is not None and game.status == GameStatus.DRAFT
+    assert game is not None and game.play_status == GamePlayStatus.ENDED
+    assert game.result_status == GameResultStatus.REJECTED
     assert game.submitted_at is None and game.submitted_by is None
     assert confirmation is not None
     assert confirmation.confirmation_status == ResultConfirmationStatus.REJECTED
     assert confirmation.confirmed_by == scenario.admin_id
     assert history is not None
-    assert (history.old_status, history.new_status) == (GameStatus.SUBMITTED, GameStatus.DRAFT)
+    assert (history.old_status, history.new_status) == (
+        GameResultStatus.SUBMITTED.value,
+        GameResultStatus.REJECTED.value,
+    )
     assert history.changed_by == scenario.admin_id
     assert audit is not None and audit.action_type == "reject"
     assert audit.reason == "Please correct this result"
-    assert audit.old_value_json["game"]["status"] == GameStatus.SUBMITTED.value
+    assert audit.old_value_json["game"]["result_status"] == GameResultStatus.SUBMITTED.value
     assert audit.old_value_json["game"]["submitted_by"] == scenario.judge_id
     assert audit.old_value_json["game"]["submitted_at"] is not None
-    assert audit.new_value_json["game"]["status"] == GameStatus.DRAFT.value
+    assert audit.new_value_json["game"]["result_status"] == GameResultStatus.REJECTED.value
     assert audit.new_value_json["game"]["submitted_by"] is None
     assert audit.new_value_json["game"]["submitted_at"] is None
 
@@ -241,7 +255,8 @@ def test_confirm_is_admin_only_creates_scores_and_official_leaderboard_entries(
     )
     assert confirmed.status_code == 200
     game_body = confirmed.json()["game"]
-    assert game_body["status"] == GameStatus.CONFIRMED.value
+    assert game_body["play_status"] == GamePlayStatus.ENDED.value
+    assert game_body["result_status"] == GameResultStatus.CONFIRMED.value
     assert game_body["confirmed_by"] == scenario.admin_id
     assert datetime.fromisoformat(game_body["confirmed_at"]).tzinfo is not None
     assert api_client.post(
@@ -260,16 +275,19 @@ def test_confirm_is_admin_only_creates_scores_and_official_leaderboard_entries(
     ) == 1
     assert db_session.scalar(
         select(func.count(GameStatusHistory.id)).where(GameStatusHistory.game_id == scenario.game_id)
-    ) == 1
+    ) == 5
     assert db_session.scalar(
         select(func.count(AuditLog.id)).where(AuditLog.entity_id == scenario.game_id)
-    ) == 1
+    ) == 3
     audit = db_session.scalar(
-        select(AuditLog).where(AuditLog.entity_id == scenario.game_id)
+        select(AuditLog).where(
+            AuditLog.entity_id == scenario.game_id,
+            AuditLog.action_type == "confirm",
+        )
     )
     assert audit is not None
-    assert audit.old_value_json["game"]["status"] == GameStatus.SUBMITTED.value
-    assert audit.new_value_json["game"]["status"] == GameStatus.CONFIRMED.value
+    assert audit.old_value_json["game"]["result_status"] == GameResultStatus.SUBMITTED.value
+    assert audit.new_value_json["game"]["result_status"] == GameResultStatus.CONFIRMED.value
     assert len(audit.new_value_json["score_logs"]) == 2
     assert {
         score_log["effective_status"] for score_log in audit.new_value_json["score_logs"]
@@ -306,7 +324,7 @@ def test_admin_revision_supports_submitted_confirmed_and_revised_states(
         headers=scenario.headers_for(scenario.admin_id),
     )
     assert response.status_code == 200
-    assert response.json()["game"]["status"] == GameStatus.REVISED.value
+    assert response.json()["game"]["result_status"] == GameResultStatus.REVISED.value
 
     save_and_submit(api_client, scenario, scenario.game_id)
     confirm(api_client, scenario, scenario.game_id)
@@ -326,7 +344,7 @@ def test_admin_revision_supports_submitted_confirmed_and_revised_states(
         headers=scenario.headers_for(scenario.admin_id),
     )
     assert revised.status_code == 200
-    assert revised.json()["game"]["status"] == GameStatus.REVISED.value
+    assert revised.json()["game"]["result_status"] == GameResultStatus.REVISED.value
 
     second_payload = scenario.valid_draft()
     second_payload["players"][0]["is_winner"] = False  # type: ignore[index]
@@ -363,10 +381,10 @@ def test_admin_revision_supports_submitted_confirmed_and_revised_states(
     ]
     assert db_session.scalar(
         select(func.count(GameStatusHistory.id)).where(GameStatusHistory.game_id == scenario.game_id)
-    ) == 3
+    ) == 6
     assert db_session.scalar(
         select(func.count(AuditLog.id)).where(AuditLog.entity_id == scenario.game_id)
-    ) == 3
+    ) == 5
 
 
 def test_confirmed_and_revised_results_are_visible_to_authenticated_users(
@@ -391,4 +409,4 @@ def test_confirmed_and_revised_results_are_visible_to_authenticated_users(
     ).status_code == 200
     revised = api_client.get(endpoint, headers=scenario.headers_for(scenario.viewer_id))
     assert revised.status_code == 200
-    assert revised.json()["game"]["status"] == GameStatus.REVISED.value
+    assert revised.json()["game"]["result_status"] == GameResultStatus.REVISED.value

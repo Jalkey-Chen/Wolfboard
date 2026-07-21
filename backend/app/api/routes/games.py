@@ -3,11 +3,11 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.core.enums import GameStatus
+from app.core.enums import GamePlayStatus, GameResultStatus
 from app.core.dependencies import get_current_user, require_role
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.game import GameCreate, GameDetail, GameSummary, JudgeOptionRead, GameUpdate
+from app.schemas.game import GameCancelRequest, GameCreate, GameDetail, GameSummary, JudgeOptionRead, GameUpdate
 from app.schemas.game_review import GameConfirmRequest, GameRejectRequest, GameReviewSummary, GameRevisionWrite
 from app.schemas.game_result import GameResultDraftRead, GameResultDraftWrite
 from app.services.event_day import get_event_day_or_404
@@ -26,6 +26,7 @@ from app.services.game_result import (
     save_game_result_draft,
     submit_game_result,
 )
+from app.services.game_state import cancel_game, end_game, start_game
 from app.services.user_directory import list_judge_capable_users
 
 
@@ -204,15 +205,58 @@ def update_game_endpoint(
     return build_game_detail_payload(game.id, db, current_user)
 
 
+@router.post("/games/{game_id}/start", response_model=GameDetail)
+def start_game_endpoint(
+    game_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> GameDetail:
+    """Start a scheduled game as its assigned judge or an admin."""
+
+    game = start_game(db, get_game_or_404(db, game_id), current_user)
+    return build_game_detail_payload(game.id, db, current_user)
+
+
+@router.post("/games/{game_id}/end", response_model=GameDetail)
+def end_game_endpoint(
+    game_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> GameDetail:
+    """End an in-progress game as its assigned judge or an admin."""
+
+    game = end_game(db, get_game_or_404(db, game_id), current_user)
+    return build_game_detail_payload(game.id, db, current_user)
+
+
+@router.post("/games/{game_id}/cancel", response_model=GameDetail)
+def cancel_game_endpoint(
+    game_id: int,
+    payload: GameCancelRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+) -> GameDetail:
+    """Cancel an unreviewed game as an admin."""
+
+    game = cancel_game(db, get_game_or_404(db, game_id), current_user, reason=payload.reason)
+    return build_game_detail_payload(game.id, db, current_user)
+
+
 @router.get("/judges/me/games", response_model=list[GameSummary])
 def read_my_judge_games(
-    status_filter: GameStatus | None = Query(default=None, alias="status"),
+    play_status_filter: GamePlayStatus | None = Query(default=None, alias="play_status"),
+    result_status_filter: GameResultStatus | None = Query(default=None, alias="result_status"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("judge")),
 ) -> list[GameSummary]:
     """Return games assigned to the current judge user."""
 
-    games = list_games_for_judge(db, current_user.id, status_filter=status_filter)
+    games = list_games_for_judge(
+        db,
+        current_user.id,
+        play_status_filter=play_status_filter,
+        result_status_filter=result_status_filter,
+    )
     return [GameSummary.model_validate(game) for game in games]
 
 

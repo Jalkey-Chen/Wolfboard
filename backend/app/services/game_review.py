@@ -6,11 +6,10 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.enums import GameStatus, ResultConfirmationStatus
+from app.core.enums import GamePlayStatus, GameResultStatus, ResultConfirmationStatus
 from app.models.event_day import EventDay
 from app.models.game import Game
 from app.models.game_participant import GameParticipant
-from app.models.game_status_history import GameStatusHistory
 from app.models.game_player import GamePlayer
 from app.models.game_format import GameFormat
 from app.models.registration import Registration
@@ -20,6 +19,11 @@ from app.models.user import User
 from app.models.user_role import UserRole
 from app.schemas.game_review import GameReviewSummary, GameRevisionWrite
 from app.services.audit import build_game_snapshot, reload_game_for_audit, write_audit_log
+from app.services.game_state import (
+    lock_game_state,
+    transition_result_status,
+    validate_game_state,
+)
 from app.services.game_result import reconcile_game_result_rows
 from app.services.result_validation import validate_game_result_payload
 from app.services.score_log import create_effective_score_logs_for_game, void_score_logs_for_game
@@ -44,7 +48,7 @@ def list_submitted_games_for_review(db: Session) -> list[GameReviewSummary]:
     statement = (
         select(Game)
         .options(*GAME_REVIEW_LOAD_OPTIONS)
-        .where(Game.status == GameStatus.SUBMITTED)
+        .where(Game.result_status == GameResultStatus.SUBMITTED)
         .order_by(Game.submitted_at.asc(), Game.id.asc())
     )
     return [GameReviewSummary.model_validate(game) for game in db.scalars(statement)]
@@ -63,55 +67,6 @@ def get_review_game_or_404(db: Session, game_id: int) -> Game:
     if game is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Game not found.")
     return game
-
-
-def _lock_current_review_version(db: Session, game: Game) -> Game:
-    """Lock and reload a game, rejecting work based on a stale review state."""
-
-    expected_status = game.status
-    expected_updated_at = game.updated_at
-    statement = (
-        select(Game)
-        .options(*GAME_REVIEW_LOAD_OPTIONS)
-        .where(Game.id == game.id)
-        .with_for_update()
-        .execution_options(populate_existing=True)
-    )
-    locked_game = db.scalar(statement)
-    if locked_game is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Game not found.")
-    if (
-        locked_game.status != expected_status
-        or locked_game.updated_at != expected_updated_at
-    ):
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="The game result changed while this review action was waiting. Reload and try again.",
-        )
-    return locked_game
-
-
-def _write_status_history(
-    db: Session,
-    *,
-    game_id: int,
-    old_status: GameStatus | None,
-    new_status: GameStatus,
-    changed_by: int,
-    reason: str | None,
-) -> None:
-    """Persist a status-transition row for later operational debugging."""
-
-    db.add(
-        GameStatusHistory(
-            game_id=game_id,
-            old_status=old_status,
-            new_status=new_status,
-            changed_by=changed_by,
-            reason=reason,
-        )
-    )
 
 
 def _write_result_confirmation(
@@ -139,25 +94,31 @@ def _write_result_confirmation(
     )
 
 
-def _ensure_status(game: Game, allowed_statuses: set[GameStatus], message: str) -> None:
+def _ensure_status(game: Game, allowed_statuses: set[GameResultStatus], message: str) -> None:
     """Ensure a game is in one of the allowed statuses before admin action."""
 
-    if game.status not in allowed_statuses:
+    if game.result_status not in allowed_statuses or game.play_status != GamePlayStatus.ENDED:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
 
 
 def confirm_game_result(db: Session, game: Game, current_user: User, *, comment: str | None) -> Game:
     """Confirm a submitted result, make it effective, and write score logs."""
 
-    game = _lock_current_review_version(db, game)
-    _ensure_status(game, {GameStatus.SUBMITTED}, "Only submitted games can be confirmed.")
+    game = lock_game_state(db, game, options=GAME_REVIEW_LOAD_OPTIONS)
+    _ensure_status(game, {GameResultStatus.SUBMITTED}, "Only submitted results for ended games can be confirmed.")
     old_snapshot = build_game_snapshot(game)
-    previous_status = game.status
     now = datetime.now(timezone.utc)
 
-    game.status = GameStatus.CONFIRMED
     game.confirmed_at = now
     game.confirmed_by = current_user.id
+    transition_result_status(
+        db,
+        game,
+        GameResultStatus.CONFIRMED,
+        transition_key="confirm_result",
+        changed_by=current_user.id,
+        reason=comment,
+    )
 
     _write_result_confirmation(
         db,
@@ -168,15 +129,8 @@ def confirm_game_result(db: Session, game: Game, current_user: User, *, comment:
         confirmation_status=ResultConfirmationStatus.APPROVED,
         comment=comment,
     )
-    _write_status_history(
-        db,
-        game_id=game.id,
-        old_status=previous_status,
-        new_status=GameStatus.CONFIRMED,
-        changed_by=current_user.id,
-        reason=comment,
-    )
     create_effective_score_logs_for_game(db, game, note="Confirmed game result.")
+    validate_game_state(game)
     db.flush()
 
     refreshed_game = reload_game_for_audit(db, game.id)
@@ -197,16 +151,22 @@ def confirm_game_result(db: Session, game: Game, current_user: User, *, comment:
 def reject_game_result(db: Session, game: Game, current_user: User, *, comment: str) -> Game:
     """Reject a submitted result and reopen the game for judge work."""
 
-    game = _lock_current_review_version(db, game)
-    _ensure_status(game, {GameStatus.SUBMITTED}, "Only submitted games can be rejected.")
+    game = lock_game_state(db, game, options=GAME_REVIEW_LOAD_OPTIONS)
+    _ensure_status(game, {GameResultStatus.SUBMITTED}, "Only submitted results for ended games can be rejected.")
     old_snapshot = build_game_snapshot(game)
-    previous_status = game.status
     submitted_by = game.submitted_by
     submitted_at = game.submitted_at
 
-    game.status = GameStatus.DRAFT
     game.submitted_at = None
     game.submitted_by = None
+    transition_result_status(
+        db,
+        game,
+        GameResultStatus.REJECTED,
+        transition_key="reject_result",
+        changed_by=current_user.id,
+        reason=comment,
+    )
 
     _write_result_confirmation(
         db,
@@ -217,14 +177,7 @@ def reject_game_result(db: Session, game: Game, current_user: User, *, comment: 
         confirmation_status=ResultConfirmationStatus.REJECTED,
         comment=comment,
     )
-    _write_status_history(
-        db,
-        game_id=game.id,
-        old_status=previous_status,
-        new_status=GameStatus.DRAFT,
-        changed_by=current_user.id,
-        reason=comment,
-    )
+    validate_game_state(game)
     db.flush()
 
     refreshed_game = reload_game_for_audit(db, game.id)
@@ -245,14 +198,14 @@ def reject_game_result(db: Session, game: Game, current_user: User, *, comment: 
 def revise_game_result(db: Session, game: Game, payload: GameRevisionWrite, current_user: User) -> Game:
     """Apply an admin revision and rebuild the formal score ledger if needed."""
 
-    game = _lock_current_review_version(db, game)
+    game = lock_game_state(db, game, options=GAME_REVIEW_LOAD_OPTIONS)
     _ensure_status(
         game,
-        {GameStatus.SUBMITTED, GameStatus.CONFIRMED, GameStatus.REVISED},
-        "Only submitted or confirmed games can be revised.",
+        {GameResultStatus.SUBMITTED, GameResultStatus.CONFIRMED, GameResultStatus.REVISED},
+        "Only submitted or effective results for ended games can be revised.",
     )
     old_snapshot = build_game_snapshot(game)
-    previous_status = game.status
+    previous_status = game.result_status
     validation = validate_game_result_payload(game, payload, submit_mode=True)
     if validation.errors:
         raise HTTPException(
@@ -265,7 +218,7 @@ def revise_game_result(db: Session, game: Game, payload: GameRevisionWrite, curr
         )
 
     affected_user_ids: set[int] = set()
-    if previous_status in {GameStatus.CONFIRMED, GameStatus.REVISED}:
+    if previous_status in {GameResultStatus.CONFIRMED, GameResultStatus.REVISED}:
         affected_user_ids = void_score_logs_for_game(
             db,
             game.id,
@@ -276,9 +229,16 @@ def revise_game_result(db: Session, game: Game, payload: GameRevisionWrite, curr
     db.flush()
     game = get_review_game_or_404(db, game.id)
 
-    game.status = GameStatus.REVISED
     game.confirmed_at = datetime.now(timezone.utc)
     game.confirmed_by = current_user.id
+    transition_result_status(
+        db,
+        game,
+        GameResultStatus.REVISED,
+        transition_key="revise_result",
+        changed_by=current_user.id,
+        reason=payload.reason,
+    )
 
     _write_result_confirmation(
         db,
@@ -289,20 +249,13 @@ def revise_game_result(db: Session, game: Game, payload: GameRevisionWrite, curr
         confirmation_status=ResultConfirmationStatus.REVISED,
         comment=payload.reason,
     )
-    _write_status_history(
-        db,
-        game_id=game.id,
-        old_status=previous_status,
-        new_status=GameStatus.REVISED,
-        changed_by=current_user.id,
-        reason=payload.reason,
-    )
     create_effective_score_logs_for_game(
         db,
         game,
         note=f"Revised by admin: {payload.reason}",
         additional_affected_user_ids=affected_user_ids,
     )
+    validate_game_state(game)
     db.flush()
 
     refreshed_game = reload_game_for_audit(db, game.id)

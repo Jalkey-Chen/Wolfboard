@@ -84,15 +84,31 @@ class GameType(str, Enum):
     PRACTICE = "practice"
 
 
-class GameStatus(str, Enum):
-    """Lifecycle states for a game record."""
+class GamePlayStatus(str, Enum):
+    """Lifecycle of the game process itself."""
 
-    DRAFT = "draft"
+    SCHEDULED = "scheduled"
     IN_PROGRESS = "in_progress"
+    ENDED = "ended"
+    CANCELLED = "cancelled"
+
+
+class GameResultStatus(str, Enum):
+    """Lifecycle of result entry and administrative review."""
+
+    EMPTY = "empty"
+    DRAFT = "draft"
     SUBMITTED = "submitted"
+    REJECTED = "rejected"
     CONFIRMED = "confirmed"
     REVISED = "revised"
-    CANCELLED = "cancelled"
+
+
+class GameStatusScope(str, Enum):
+    """Status-machine dimension recorded by game status history."""
+
+    PLAY = "play"
+    RESULT = "result"
 
 
 class GamePlayerFaction(str, Enum):

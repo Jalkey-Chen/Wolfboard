@@ -7,7 +7,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.enums import GameStatus, ScoreAdjustmentType
+from app.core.enums import GamePlayStatus, GameResultStatus, ScoreAdjustmentType
 from app.models.event_day import EventDay
 from app.models.game import Game
 from app.models.game_participant import GameParticipant
@@ -30,6 +30,14 @@ from app.schemas.game_result import (
 )
 from app.services.result_scoring import calculate_adjustment_score, calculate_base_score, calculate_final_score
 from app.services.result_validation import validate_game_result_payload
+from app.services.audit import build_game_snapshot
+from app.services.game_state import (
+    lock_game_state,
+    transition_play_status,
+    transition_result_status,
+    validate_game_state,
+    write_game_state_audit,
+)
 
 
 GAME_RESULT_LOAD_OPTIONS = (
@@ -54,29 +62,6 @@ def get_game_result_or_404(db: Session, game_id: int) -> Game:
     return game
 
 
-def _lock_current_result_draft(db: Session, game: Game) -> Game:
-    """Serialize full-draft reconciles and reload participant identity state."""
-
-    expected_status = game.status
-    statement = (
-        select(Game)
-        .options(*GAME_RESULT_LOAD_OPTIONS)
-        .where(Game.id == game.id)
-        .with_for_update()
-        .execution_options(populate_existing=True)
-    )
-    locked_game = db.scalar(statement)
-    if locked_game is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Game not found.")
-    if locked_game.status != expected_status:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="The game result changed while this draft save was waiting. Reload and try again.",
-        )
-    return locked_game
-
-
 def _sorted_players(game: Game) -> list[GamePlayer]:
     """Return result rows in stable seat-first display order."""
 
@@ -95,7 +80,7 @@ def ensure_can_view_game_result(game: Game, current_user: User) -> None:
 
     if "admin" in current_user.roles:
         return
-    if game.status in {GameStatus.CONFIRMED, GameStatus.REVISED}:
+    if game.result_status in {GameResultStatus.CONFIRMED, GameResultStatus.REVISED}:
         return
     if current_user.id == game.judge_user_id and "judge" in current_user.roles:
         return
@@ -107,7 +92,11 @@ def ensure_can_edit_game_result(game: Game, current_user: User) -> None:
 
     if "judge" not in current_user.roles or current_user.id != game.judge_user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the assigned judge can edit this game result.")
-    if game.status not in {GameStatus.DRAFT, GameStatus.IN_PROGRESS}:
+    if game.play_status == GamePlayStatus.CANCELLED or game.result_status not in {
+        GameResultStatus.EMPTY,
+        GameResultStatus.DRAFT,
+        GameResultStatus.REJECTED,
+    }:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Submitted or closed games can no longer be edited by the judge.",
@@ -213,7 +202,13 @@ def build_game_result_response(game: Game, current_user: User) -> GameResultDraf
         format_roles=[FormatRoleRead.model_validate(format_role) for format_role in game.format.format_roles],
         selectable_players=_build_selectable_players(game),
         validation=validation,
-        editable=("judge" in current_user.roles and current_user.id == game.judge_user_id and game.status in {GameStatus.DRAFT, GameStatus.IN_PROGRESS}),
+        editable=(
+            "judge" in current_user.roles
+            and current_user.id == game.judge_user_id
+            and game.play_status != GamePlayStatus.CANCELLED
+            and game.result_status
+            in {GameResultStatus.EMPTY, GameResultStatus.DRAFT, GameResultStatus.REJECTED}
+        ),
     )
 
 
@@ -410,16 +405,42 @@ def _raise_validation_error(message: str, validation: ValidationSummary) -> None
 
 
 def save_game_result_draft(db: Session, game: Game, payload: GameResultDraftWrite, current_user: User) -> Game:
-    """Reconcile the current draft snapshot and mark the game in progress."""
+    """Reconcile a draft and record any compatible play/result transitions."""
 
-    game = _lock_current_result_draft(db, game)
+    game = lock_game_state(db, game, options=GAME_RESULT_LOAD_OPTIONS)
     ensure_can_edit_game_result(game, current_user)
     validation = validate_game_result_payload(game, payload, submit_mode=False)
     if validation.errors:
         _raise_validation_error("Draft validation failed.", validation)
 
+    old_snapshot = build_game_snapshot(game)
     reconcile_game_result_rows(db, game, payload, current_user)
-    game.status = GameStatus.IN_PROGRESS
+    state_changed = False
+    if game.play_status == GamePlayStatus.SCHEDULED:
+        state_changed = transition_play_status(
+            db,
+            game,
+            GamePlayStatus.IN_PROGRESS,
+            transition_key="auto_start_on_draft",
+            changed_by=current_user.id,
+        ) or state_changed
+    if game.result_status in {GameResultStatus.EMPTY, GameResultStatus.REJECTED}:
+        state_changed = transition_result_status(
+            db,
+            game,
+            GameResultStatus.DRAFT,
+            transition_key="save_result_draft",
+            changed_by=current_user.id,
+        ) or state_changed
+    validate_game_state(game)
+    if state_changed:
+        write_game_state_audit(
+            db,
+            game=game,
+            current_user=current_user,
+            action_type="save_result_draft",
+            old_snapshot=old_snapshot,
+        )
     db.commit()
     # Return a newly loaded aggregate so relationship order and replaced
     # adjustment children exactly match the committed draft.
@@ -430,14 +451,43 @@ def save_game_result_draft(db: Session, game: Game, payload: GameResultDraftWrit
 def submit_game_result(db: Session, game: Game, current_user: User) -> Game:
     """Validate the current persisted draft and mark the game as submitted."""
 
-    ensure_can_edit_game_result(game, current_user)
+    game = lock_game_state(db, game, options=GAME_RESULT_LOAD_OPTIONS)
+    if "judge" not in current_user.roles or current_user.id != game.judge_user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the assigned judge can submit this game result.")
+    if game.result_status != GameResultStatus.DRAFT:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only a saved draft can be submitted.")
+    if game.play_status not in {GamePlayStatus.IN_PROGRESS, GamePlayStatus.ENDED}:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="The game must be in progress or ended before submission.")
     payload, validation = _build_validation(game)
     _ = payload
     if validation.errors:
         _raise_validation_error("Result submission validation failed.", validation)
 
-    game.status = GameStatus.SUBMITTED
+    old_snapshot = build_game_snapshot(game)
+    if game.play_status == GamePlayStatus.IN_PROGRESS:
+        transition_play_status(
+            db,
+            game,
+            GamePlayStatus.ENDED,
+            transition_key="auto_end_on_submit",
+            changed_by=current_user.id,
+        )
     game.submitted_at = datetime.now(timezone.utc)
     game.submitted_by = current_user.id
+    transition_result_status(
+        db,
+        game,
+        GameResultStatus.SUBMITTED,
+        transition_key="submit_result",
+        changed_by=current_user.id,
+    )
+    validate_game_state(game)
+    write_game_state_audit(
+        db,
+        game=game,
+        current_user=current_user,
+        action_type="submit_result",
+        old_snapshot=old_snapshot,
+    )
     db.commit()
     return get_game_result_or_404(db, game.id)

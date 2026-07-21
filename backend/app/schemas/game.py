@@ -1,10 +1,11 @@
 """Schemas for game list, detail, and admin management workflows."""
 
 from datetime import date, datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, StringConstraints
 
-from app.core.enums import GameStatus, GameType
+from app.core.enums import GamePlayStatus, GameResultStatus, GameType
 
 
 class JudgeOptionRead(BaseModel):
@@ -42,9 +43,6 @@ class GameCreate(BaseModel):
     judge_user_id: int
     game_type: GameType = GameType.OFFICIAL
     notes: str | None = None
-    started_at: datetime | None = None
-    ended_at: datetime | None = None
-
     model_config = ConfigDict(extra="forbid")
 
 
@@ -57,10 +55,13 @@ class GameUpdate(BaseModel):
     judge_user_id: int | None = None
     game_type: GameType | None = None
     notes: str | None = None
-    started_at: datetime | None = None
-    ended_at: datetime | None = None
-
     model_config = ConfigDict(extra="forbid")
+
+
+class GameCancelRequest(BaseModel):
+    """Required reason for the dedicated game cancellation transition."""
+
+    reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class GameSummary(BaseModel):
@@ -79,9 +80,13 @@ class GameSummary(BaseModel):
     judge_user_id: int
     judge_display_name: str
     game_type: GameType
-    status: GameStatus
+    play_status: GamePlayStatus
+    result_status: GameResultStatus
     started_at: datetime | None
     ended_at: datetime | None
+    cancelled_at: datetime | None
+    cancelled_by: int | None
+    cancellation_reason: str | None
     notes: str | None
     created_at: datetime
     updated_at: datetime
