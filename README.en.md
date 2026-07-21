@@ -356,12 +356,60 @@ uv run alembic revision --autogenerate -m "describe your change"
 
 ## Tests
 
-Run backend tests:
+Install frontend dependencies from the committed `package-lock.json` and run the same checks as CI:
+
+```bash
+cd frontend
+npm ci
+npm run lint
+npx tsc --noEmit
+npm run build
+```
+
+Use the locked `uv.lock` dependencies for backend checks:
 
 ```bash
 cd backend
-uv run pytest
+uv sync --frozen --dev
+uv run pytest -q
+uv run alembic heads
 ```
+
+`pytest` runs both unit tests and integration tests against real PostgreSQL. The integration suite neither substitutes SQLite nor runs the seed script:
+
+- Without `TEST_DATABASE_ADMIN_URL`, the fixtures start local PostgreSQL from `docker-compose.test.yml`.
+- Each pytest session creates a randomly named `wolfboard_test_*` database and runs `alembic upgrade head` automatically.
+- Application tables are truncated before each test while the Alembic revision is preserved. The random database and any fixture-owned containers are removed after success or failure.
+- CI may point `TEST_DATABASE_ADMIN_URL` at its dedicated PostgreSQL service. Never point it at a development or production database.
+
+The local test PostgreSQL service can also be started explicitly:
+
+```bash
+docker compose --project-name wolfboard-tests -f docker-compose.test.yml up --detach --wait
+cd backend
+uv run pytest -q
+```
+
+When no external test URL is set, pytest owns and removes that Compose service at the end of the run.
+
+### CI quality gates
+
+`.github/workflows/quality.yml` runs two parallel jobs on pushes and pull requests:
+
+- Frontend: `npm ci`, ESLint, TypeScript checking, and a production build.
+- Backend: `uv sync --frozen --dev`, a CI-only PostgreSQL service, `alembic upgrade head`, and `pytest -q`.
+- CI does not run the seed script and does not require real secrets.
+
+### Known strict xfails
+
+The following M6 prerequisite defects are executable `xfail(strict=True)` specifications, never ordinary skips:
+
+- `M6.0B`: the draft-save PUT response can retain a stale player relationship cache until a new request.
+- `M6.0B`: rejection clears `submitted_by/submitted_at` before `ResultConfirmation` captures the original submission.
+- `M6.0B`: generic `PATCH /games/{id}` can bypass the result transition services.
+- `M6.0B`: repeated draft saves delete and recreate `GamePlayer` rows, changing their IDs.
+- `M6.0C`: effective score logs from non-official games participate in season `balance_after` recalculation.
+- `M6.0C`: revision replacement rows and later balance recalculation for a removed player still need a unified correction.
 
 ## Not Implemented Yet
 

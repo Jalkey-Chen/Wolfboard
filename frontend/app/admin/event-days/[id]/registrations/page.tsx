@@ -50,11 +50,11 @@ export default function AdminEventDayRegistrationsPage() {
       return;
     }
 
-    async function loadPage() {
+    async function loadPage(authToken: string) {
       try {
         const [eventDayResponse, registrationResponse] = await Promise.all([
-          getEventDay(token, eventDayId),
-          getEventDayRegistrations(token, eventDayId),
+          getEventDay(authToken, eventDayId),
+          getEventDayRegistrations(authToken, eventDayId),
         ]);
         setEventDay(eventDayResponse);
         setRegistrations(registrationResponse);
@@ -66,7 +66,7 @@ export default function AdminEventDayRegistrationsPage() {
       }
     }
 
-    void loadPage();
+    void loadPage(token);
   }, [eventDayId, profile, t, token]);
 
   const rows = useMemo(
