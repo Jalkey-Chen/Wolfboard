@@ -297,9 +297,20 @@ def test_revision_recalculates_later_balances_for_removed_player(
     assert before_revision is not None
     assert before_revision.balance_after == 2.5
 
+    current_result = api_client.get(
+        f"{API_PREFIX}/games/{scenario.game_id}/result-draft",
+        headers=scenario.headers_for(scenario.admin_id),
+    )
+    assert current_result.status_code == 200
+    participants_by_user = {
+        player["user_id"]: player["participant_id"]
+        for player in current_result.json()["players"]
+    }
+
     replacement_payload = {
         "players": [
             {
+                "participant_id": participants_by_user[scenario.player_two_id],
                 "user_id": scenario.player_two_id,
                 "seat_number": 1,
                 "role_name": "Seer",
@@ -421,10 +432,6 @@ def test_revision_recalculates_later_balances_for_removed_player(
     ) == 2
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="M6.0C: stable participant identity awaits the dedicated participant model decision.",
-)
 def test_repeated_draft_save_preserves_game_player_ids(
     api_client: TestClient,
     db_session: Session,
@@ -436,10 +443,16 @@ def test_repeated_draft_save_preserves_game_player_ids(
     first = api_client.put(endpoint, json=scenario.valid_draft(), headers=headers)
     assert first.status_code == 200
     first_ids = [player["id"] for player in first.json()["players"]]
-    second = api_client.put(endpoint, json=scenario.valid_draft(), headers=headers)
+    first_participant_ids = [player["participant_id"] for player in first.json()["players"]]
+    second_payload = scenario.valid_draft()
+    for player, participant_id in zip(second_payload["players"], first_participant_ids, strict=True):
+        player["participant_id"] = participant_id
+    second = api_client.put(endpoint, json=second_payload, headers=headers)
     assert second.status_code == 200
     second_ids = [player["id"] for player in second.json()["players"]]
+    second_participant_ids = [player["participant_id"] for player in second.json()["players"]]
 
     assert second_ids == first_ids
+    assert second_participant_ids == first_participant_ids
     db_session.expire_all()
     assert len(list(db_session.scalars(select(GamePlayer)))) == 2
