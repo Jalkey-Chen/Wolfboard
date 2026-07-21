@@ -17,6 +17,7 @@ import type {
 
 export type EditableGameResultPlayer = {
   row_id: string;
+  participant_id: number | null;
   user_id: number | null;
   seat_number: number | null;
   role_name: string;
