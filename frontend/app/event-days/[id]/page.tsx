@@ -248,7 +248,7 @@ export default function EventDayDetailPage() {
                         </p>
                       </div>
                       <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
-                        {enumLabel("gameType", game.game_type)} · {enumLabel("gameStatus", game.status)}
+                        {enumLabel("gameType", game.game_type)} · {enumLabel("gamePlayStatus", game.play_status)} · {enumLabel("gameResultStatus", game.result_status)}
                       </div>
                     </div>
                   </Link>

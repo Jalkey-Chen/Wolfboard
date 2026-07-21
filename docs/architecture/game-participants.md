@@ -36,4 +36,4 @@ The API continues to flatten `user_id` and `seat_number` into result-player resp
 
 ## Deferred Work
 
-M6.0C does not add guest-management UI, freeze game roles or formats, or create event records. M6.0D is expected to address play/result status separation and historical format snapshots before event-stream work begins.
+M6.0C does not add guest-management UI, freeze game roles or formats, or create event records. M6.0D1 now supplies independent play/result state machines and freezes `format_id` after play begins. M6.0D2 remains responsible for immutable historical format and role snapshots before event-stream work begins.

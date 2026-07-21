@@ -1,13 +1,13 @@
 """Executable specifications for known M6 prerequisite defects."""
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.enums import GameStatus, GameType, ScoreLogEffectiveStatus
+from app.core.enums import GamePlayStatus, GameResultStatus, GameType, ScoreLogEffectiveStatus
 from app.models.game import Game
 from app.models.game_player import GamePlayer
 from app.models.event_day import EventDay
@@ -81,6 +81,17 @@ def test_rejection_preserves_original_submission_metadata(
     assert confirmation.submitted_by == scenario.judge_id
     assert confirmation.submitted_at == original_submitted_at
 
+    direct_resubmit = api_client.post(
+        f"{API_PREFIX}/games/{scenario.game_id}/submit-result",
+        headers=scenario.headers_for(scenario.judge_id),
+    )
+    assert direct_resubmit.status_code == 409
+    resaved = api_client.put(
+        f"{API_PREFIX}/games/{scenario.game_id}/result-draft",
+        json=scenario.valid_draft(),
+        headers=scenario.headers_for(scenario.judge_id),
+    )
+    assert resaved.status_code == 200
     resubmitted = api_client.post(
         f"{API_PREFIX}/games/{scenario.game_id}/submit-result",
         headers=scenario.headers_for(scenario.judge_id),
@@ -112,13 +123,13 @@ def test_generic_patch_cannot_bypass_confirmed_result_state_machine(
 
     response = api_client.patch(
         f"{API_PREFIX}/games/{scenario.game_id}",
-        json={"status": GameStatus.DRAFT.value},
+        json={"result_status": GameResultStatus.DRAFT.value},
         headers=scenario.headers_for(scenario.admin_id),
     )
     assert response.status_code == 422
     db_session.expire_all()
     game = db_session.get(Game, scenario.game_id)
-    assert game is not None and game.status == GameStatus.CONFIRMED
+    assert game is not None and game.result_status == GameResultStatus.CONFIRMED
 
     allowed_patch = api_client.patch(
         f"{API_PREFIX}/games/{scenario.game_id}",
@@ -128,7 +139,7 @@ def test_generic_patch_cannot_bypass_confirmed_result_state_machine(
     assert allowed_patch.status_code == 200
     assert allowed_patch.json()["notes"] == "Operational note"
     assert allowed_patch.json()["table_number"] == 9
-    assert allowed_patch.json()["status"] == GameStatus.CONFIRMED.value
+    assert allowed_patch.json()["result_status"] == GameResultStatus.CONFIRMED.value
 
 
 def test_game_creation_only_allows_draft_initial_status(
@@ -147,7 +158,7 @@ def test_game_creation_only_allows_draft_initial_status(
 
     forbidden = api_client.post(
         f"{API_PREFIX}/games",
-        json={**payload, "status": GameStatus.CONFIRMED.value},
+        json={**payload, "result_status": GameResultStatus.CONFIRMED.value},
         headers=scenario.headers_for(scenario.admin_id),
     )
     assert forbidden.status_code == 422
@@ -158,7 +169,8 @@ def test_game_creation_only_allows_draft_initial_status(
         headers=scenario.headers_for(scenario.admin_id),
     )
     assert created.status_code == 200
-    assert created.json()["status"] == GameStatus.DRAFT.value
+    assert created.json()["play_status"] == GamePlayStatus.SCHEDULED.value
+    assert created.json()["result_status"] == GameResultStatus.EMPTY.value
 
 
 def test_non_official_score_logs_do_not_affect_official_running_balance(
@@ -256,7 +268,8 @@ def test_non_official_score_logs_do_not_affect_official_running_balance(
         format_id=scenario.format_id,
         judge_user_id=scenario.judge_id,
         game_type=GameType.OFFICIAL,
-        status=GameStatus.DRAFT,
+        play_status=GamePlayStatus.SCHEDULED,
+        result_status=GameResultStatus.EMPTY,
     )
     db_session.add(second_season_game)
     db_session.commit()
@@ -456,3 +469,34 @@ def test_repeated_draft_save_preserves_game_player_ids(
     assert second_participant_ids == first_participant_ids
     db_session.expire_all()
     assert len(list(db_session.scalars(select(GamePlayer)))) == 2
+
+
+def test_legacy_cancelled_effective_result_is_excluded_from_standings(
+    api_client: TestClient,
+    db_session: Session,
+) -> None:
+    scenario = create_result_scenario(db_session)
+    save_and_submit(api_client, scenario, scenario.game_id)
+    confirm(api_client, scenario, scenario.game_id)
+
+    db_session.expire_all()
+    game = db_session.get(Game, scenario.game_id)
+    assert game is not None
+    game.play_status = GamePlayStatus.CANCELLED
+    game.cancelled_at = datetime.now(timezone.utc)
+    game.cancellation_reason = "Legacy cancelled state"
+    db_session.commit()
+
+    leaderboard = api_client.get(
+        f"{API_PREFIX}/seasons/{scenario.season_id}/leaderboard",
+        headers=scenario.headers_for(scenario.viewer_id),
+    )
+    assert leaderboard.status_code == 200
+    assert leaderboard.json() == []
+    profile = api_client.get(
+        f"{API_PREFIX}/players/{scenario.player_one_id}/profile",
+        headers=scenario.headers_for(scenario.player_one_id),
+    )
+    assert profile.status_code == 200
+    assert profile.json()["total_score"] == 0.0
+    assert profile.json()["history"] == []

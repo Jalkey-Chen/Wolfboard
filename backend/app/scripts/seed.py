@@ -16,7 +16,8 @@ from app.core.enums import (
     FormatRoleFaction,
     GamePlayerFaction,
     GamePlayerFinalStatus,
-    GameStatus,
+    GamePlayStatus,
+    GameResultStatus,
     GameType,
     RegistrationStatus,
     RegistrationType,
@@ -658,7 +659,8 @@ def seed_games() -> None:
                 "format_key": "wolf-king-guard",
                 "judge_username": "judge_user",
                 "game_type": GameType.OFFICIAL,
-                "status": GameStatus.DRAFT,
+                "play_status": GamePlayStatus.SCHEDULED,
+                "result_status": GameResultStatus.EMPTY,
                 "notes": f"{SEEDED_GAME_NOTE_PREFIX}：正式局第 1 轮。",
             },
             {
@@ -668,7 +670,8 @@ def seed_games() -> None:
                 "format_key": "wolf-beauty-knight",
                 "judge_username": "admin_user",
                 "game_type": GameType.OFFICIAL,
-                "status": GameStatus.DRAFT,
+                "play_status": GamePlayStatus.SCHEDULED,
+                "result_status": GameResultStatus.EMPTY,
                 "notes": f"{SEEDED_GAME_NOTE_PREFIX}：正式局第 2 轮。",
             },
             {
@@ -678,7 +681,8 @@ def seed_games() -> None:
                 "format_key": "mecha-wolf-medium",
                 "judge_username": "judge_user",
                 "game_type": GameType.OFFICIAL,
-                "status": GameStatus.IN_PROGRESS,
+                "play_status": GamePlayStatus.IN_PROGRESS,
+                "result_status": GameResultStatus.DRAFT,
                 "notes": f"{SEEDED_GAME_NOTE_PREFIX}：正式局第 3 轮。",
             },
             {
@@ -688,7 +692,8 @@ def seed_games() -> None:
                 "format_key": "masquerade-ball",
                 "judge_username": "admin_user",
                 "game_type": GameType.FUN,
-                "status": GameStatus.CONFIRMED,
+                "play_status": GamePlayStatus.ENDED,
+                "result_status": GameResultStatus.CONFIRMED,
                 "notes": f"{SEEDED_GAME_NOTE_PREFIX}：娱乐副桌。",
             },
         ]
@@ -733,17 +738,27 @@ def seed_games() -> None:
             game.format_id = game_format.id
             game.judge_user_id = judge_user.id
             game.game_type = game_payload["game_type"]
-            game.status = game_payload["status"]
+            game.play_status = game_payload["play_status"]
+            game.result_status = game_payload["result_status"]
             game.notes = game_payload["notes"]
-            if game.status == GameStatus.CONFIRMED:
+            game.cancelled_at = None
+            game.cancelled_by = None
+            game.cancellation_reason = None
+            if game.play_status == GamePlayStatus.ENDED:
                 game.started_at = datetime(2026, 3, 29, 13, 0, tzinfo=timezone.utc)
                 game.ended_at = datetime(2026, 3, 29, 14, 30, tzinfo=timezone.utc)
-            elif game.status == GameStatus.IN_PROGRESS:
+                game.confirmed_at = datetime(2026, 3, 29, 15, 0, tzinfo=timezone.utc)
+                game.confirmed_by = users_by_username["admin_user"].id
+            elif game.play_status == GamePlayStatus.IN_PROGRESS:
                 game.started_at = datetime(2026, 4, 5, 13, 0, tzinfo=timezone.utc)
                 game.ended_at = None
+                game.confirmed_at = None
+                game.confirmed_by = None
             else:
                 game.started_at = None
                 game.ended_at = None
+                game.confirmed_at = None
+                game.confirmed_by = None
 
         db.flush()
         sample_game = db.scalar(

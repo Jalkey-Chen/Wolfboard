@@ -248,7 +248,8 @@ Adjustments are stored in `score_adjustments`, while official standings are driv
 
 The leaderboard counts only:
 
-- `game.status IN (confirmed, revised)`
+- `game.result_status IN (confirmed, revised)`
+- `game.play_status = ended`
 - `game.game_type = official`
 - `score_logs.effective_status = effective`
 
@@ -258,12 +259,16 @@ That means:
 - revisions void old ledger rows
 - new effective ledger rows are rebuilt after revision
 
-### Game state and concurrent review
+### Independent game and result state machines
 
-- New games are always created as `draft`. Generic `PATCH /games/{id}` edits only scheduling and operational fields and no longer accepts `status`.
-- `in_progress`, `submitted`, `confirmed`, `revised`, and rejection back to `draft` can only be produced by their result workflow endpoints. Cancellation has no dedicated endpoint yet and cannot use generic PATCH as a bypass.
-- Confirm, reject, and revise use PostgreSQL `SELECT ... FOR UPDATE` within the same database transaction. If the review state changes while an action waits for the row lock, the API returns `409 Conflict`.
-- Confirm, reject, and revise write `GameStatusHistory` and `AuditLog`. To keep M6.0B scoped, the first draft save and submit retain their existing behavior and do not yet write those histories.
+- New games are fixed at `play_status=scheduled` and `result_status=empty`; create and generic PATCH accept neither state nor lifecycle timestamps.
+- Play follows `scheduled -> in_progress -> ended`. Admins can cancel scheduled/in-progress games and ended games that have not entered review through `POST /games/{id}/start|end|cancel`.
+- Results follow `empty -> draft -> submitted -> confirmed`; rejection follows `submitted -> rejected -> draft`, and admins can revise submitted/confirmed/revised results into revised.
+- The first draft save temporarily auto-starts a scheduled game, while submitting an in-progress draft ends play in the same transaction. A future event-entry UI will start games explicitly.
+- Game number, format, and game type freeze once play or result entry begins. Cancelled games are read-only. The current cancellation action cannot void submitted or effective score ledgers.
+- State operations use PostgreSQL `SELECT ... FOR UPDATE` and revalidate both states after locking. Conflicts return `409` without partial history, audit, confirmation, or ledger rows.
+- `GameStatusHistory` records actual value changes with `status_scope=play|result` and a `transition_key`. Repeated revisions do not add same-value history, but every revision still writes ResultConfirmation and AuditLog.
+- Start, end, cancel, first/post-rejection draft save, submit, reject, confirm, and revise all write AuditLog. See `docs/architecture/game-state-machines.md`.
 
 ### ScoreLog ledger semantics
 
@@ -279,7 +284,7 @@ That means:
 - Result APIs still flatten `user_id` and `seat_number` for compatibility and now include `participant_id`; later PUT and revise requests should return that ID unchanged.
 - Draft writes reconcile by participant: retained rows update in place, additions create rows, and removals delete only their own aggregate. Identical repeated saves preserve participant and result IDs.
 - Display names are snapshotted when an account is bound and do not follow later account renames. Guest creation UI and frozen role/format definitions remain deferred.
-- See `docs/architecture/game-participants.md` for the boundary. M6.0D is expected to address play/review status separation and historical format snapshots.
+- See `docs/architecture/game-participants.md` for the boundary. M6.0D2 will add immutable historical format snapshots.
 
 ## Useful Local Verification Flows
 

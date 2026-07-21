@@ -87,7 +87,7 @@ export default function AdminGameReviewPage() {
     return null;
   }
 
-  const canConfirmOrReject = draft?.game.status === "submitted";
+  const canConfirmOrReject = draft?.game.result_status === "submitted";
   const metaLabelClass = getMetaLabelClass(language);
 
   return (
@@ -135,8 +135,9 @@ export default function AdminGameReviewPage() {
                   <div className="mt-2 text-sm font-semibold text-slate-700">{draft.game.format.format_name}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className={metaLabelClass}>{t("common.status")}</div>
-                  <div className="mt-2 text-sm font-semibold text-slate-700">{enumLabel("gameStatus", draft.game.status)}</div>
+                  <div className={metaLabelClass}>{t("common.playStatus")}</div>
+                  <div className="mt-2 text-sm font-semibold text-slate-700">{enumLabel("gamePlayStatus", draft.game.play_status)}</div>
+                  <div className="mt-1 text-xs text-slate-500">{t("common.resultStatus")}: {enumLabel("gameResultStatus", draft.game.result_status)}</div>
                   <div className="mt-1 text-xs text-slate-500">{t("resultEntry.submittedAt")} {formatDateTime(draft.game.submitted_at)}</div>
                 </div>
               </div>

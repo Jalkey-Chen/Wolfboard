@@ -1,7 +1,7 @@
 """Minimal fixtures and request helpers for result-flow integration tests."""
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timezone
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -10,7 +10,8 @@ from app.core.enums import (
     FormatRoleFaction,
     GamePlayerFaction,
     GamePlayerFinalStatus,
-    GameStatus,
+    GamePlayStatus,
+    GameResultStatus,
     GameType,
 )
 from app.core.security import create_access_token
@@ -101,8 +102,10 @@ def create_result_scenario(
     db: Session,
     *,
     game_type: GameType = GameType.OFFICIAL,
-    game_status: GameStatus = GameStatus.DRAFT,
+    play_status: GamePlayStatus = GamePlayStatus.SCHEDULED,
+    result_status: GameResultStatus = GameResultStatus.EMPTY,
 ) -> ResultScenario:
+    now = datetime.now(timezone.utc)
     roles = {
         key: Role(role_key=key, role_name=key.title(), description=f"Test {key} role")
         for key in ("admin", "judge", "player")
@@ -174,7 +177,16 @@ def create_result_scenario(
         format_id=game_format.id,
         judge_user_id=judge.id,
         game_type=game_type,
-        status=game_status,
+        play_status=play_status,
+        result_status=result_status,
+        started_at=now if play_status in {GamePlayStatus.IN_PROGRESS, GamePlayStatus.ENDED} else None,
+        ended_at=now if play_status == GamePlayStatus.ENDED else None,
+        submitted_at=now if result_status == GameResultStatus.SUBMITTED else None,
+        submitted_by=judge.id if result_status == GameResultStatus.SUBMITTED else None,
+        confirmed_at=now if result_status in {GameResultStatus.CONFIRMED, GameResultStatus.REVISED} else None,
+        confirmed_by=admin.id if result_status in {GameResultStatus.CONFIRMED, GameResultStatus.REVISED} else None,
+        cancelled_at=now if play_status == GamePlayStatus.CANCELLED else None,
+        cancellation_reason="Cancelled integration fixture" if play_status == GamePlayStatus.CANCELLED else None,
     )
     db.add(game)
     db.commit()
@@ -199,9 +211,11 @@ def create_additional_game(
     scenario: ResultScenario,
     *,
     game_type: GameType = GameType.OFFICIAL,
-    status: GameStatus = GameStatus.DRAFT,
+    play_status: GamePlayStatus = GamePlayStatus.SCHEDULED,
+    result_status: GameResultStatus = GameResultStatus.EMPTY,
     judge_user_id: int | None = None,
 ) -> int:
+    now = datetime.now(timezone.utc)
     existing_count = db.query(Game).filter(Game.event_day_id == scenario.event_day_id).count()
     game = Game(
         event_day_id=scenario.event_day_id,
@@ -210,13 +224,20 @@ def create_additional_game(
         format_id=scenario.format_id,
         judge_user_id=judge_user_id or scenario.judge_id,
         game_type=game_type,
-        status=status,
+        play_status=play_status,
+        result_status=result_status,
+        started_at=now if play_status in {GamePlayStatus.IN_PROGRESS, GamePlayStatus.ENDED} else None,
+        ended_at=now if play_status == GamePlayStatus.ENDED else None,
+        submitted_at=now if result_status == GameResultStatus.SUBMITTED else None,
+        submitted_by=scenario.judge_id if result_status == GameResultStatus.SUBMITTED else None,
+        confirmed_at=now if result_status in {GameResultStatus.CONFIRMED, GameResultStatus.REVISED} else None,
+        confirmed_by=scenario.admin_id if result_status in {GameResultStatus.CONFIRMED, GameResultStatus.REVISED} else None,
+        cancelled_at=now if play_status == GamePlayStatus.CANCELLED else None,
+        cancellation_reason="Cancelled integration fixture" if play_status == GamePlayStatus.CANCELLED else None,
     )
     db.add(game)
     db.commit()
     return game.id
-
-
 def save_and_submit(
     client: TestClient,
     scenario: ResultScenario,

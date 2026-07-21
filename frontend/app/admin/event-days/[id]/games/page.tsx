@@ -14,7 +14,7 @@ import { useParams } from "next/navigation";
 import { useI18n } from "@/components/language-provider";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
-import { formatDate, toDateTimeLocalValue } from "@/lib/date";
+import { formatDate } from "@/lib/date";
 import {
   createGame,
   getEventDay,
@@ -41,8 +41,6 @@ type FormState = {
   judge_user_id: string;
   game_type: GameType;
   notes: string;
-  started_at: string;
-  ended_at: string;
 };
 
 
@@ -56,8 +54,6 @@ function emptyFormState(): FormState {
     judge_user_id: "",
     game_type: "official",
     notes: "",
-    started_at: "",
-    ended_at: "",
   };
 }
 
@@ -76,8 +72,6 @@ function buildFormState(game: GameSummary | null): FormState {
     judge_user_id: String(game.judge_user_id),
     game_type: game.game_type,
     notes: game.notes ?? "",
-    started_at: toDateTimeLocalValue(game.started_at),
-    ended_at: toDateTimeLocalValue(game.ended_at),
   };
 }
 
@@ -156,8 +150,6 @@ export default function AdminEventDayGamesPage() {
       judge_user_id: Number(formState.judge_user_id),
       game_type: formState.game_type,
       notes: formState.notes || null,
-      started_at: formState.started_at || null,
-      ended_at: formState.ended_at || null,
     };
 
     try {
@@ -171,8 +163,6 @@ export default function AdminEventDayGamesPage() {
           judge_user_id: payload.judge_user_id,
           game_type: payload.game_type,
           notes: payload.notes,
-          started_at: payload.started_at,
-          ended_at: payload.ended_at,
         });
       } else {
         await createGame(token, payload);
@@ -248,7 +238,7 @@ export default function AdminEventDayGamesPage() {
                       {game.format_name} · {t("common.judge")}: {game.judge_display_name}
                     </p>
                     <p className="mt-2 text-sm text-slate-600">
-                      {t("common.type")}: {enumLabel("gameType", game.game_type)} · {t("common.status")}: {enumLabel("gameStatus", game.status)}
+                      {t("common.type")}: {enumLabel("gameType", game.game_type)} · {t("common.playStatus")}: {enumLabel("gamePlayStatus", game.play_status)} · {t("common.resultStatus")}: {enumLabel("gameResultStatus", game.result_status)}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-3">
@@ -340,18 +330,6 @@ export default function AdminEventDayGamesPage() {
                 </option>
               ))}
             </select>
-            <input
-              className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
-              onChange={(event) => setFormState((current) => ({ ...current, started_at: event.target.value }))}
-              type="datetime-local"
-              value={formState.started_at}
-            />
-            <input
-              className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
-              onChange={(event) => setFormState((current) => ({ ...current, ended_at: event.target.value }))}
-              type="datetime-local"
-              value={formState.ended_at}
-            />
             <textarea
               className="min-h-28 rounded-2xl border border-slate-200 px-4 py-3 text-sm"
               onChange={(event) => setFormState((current) => ({ ...current, notes: event.target.value }))}

@@ -3,7 +3,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.enums import GameStatus, ScoreLogEffectiveStatus
+from app.core.enums import GamePlayStatus, GameResultStatus, ScoreLogEffectiveStatus
 from app.models.event_day import EventDay
 from app.models.game import Game
 from app.models.score_log import ScoreLog
@@ -34,7 +34,8 @@ def build_player_profile(db: Session, player_id: int) -> PlayerProfileRead:
         .where(
             ScoreLog.user_id == player_id,
             ScoreLog.effective_status == ScoreLogEffectiveStatus.EFFECTIVE,
-            Game.status.in_([GameStatus.CONFIRMED, GameStatus.REVISED]),
+            Game.play_status == GamePlayStatus.ENDED,
+            Game.result_status.in_([GameResultStatus.CONFIRMED, GameResultStatus.REVISED]),
         )
         .order_by(EventDay.event_date.desc(), Game.table_number.asc(), Game.game_number.asc(), ScoreLog.id.desc())
     )
@@ -44,7 +45,7 @@ def build_player_profile(db: Session, player_id: int) -> PlayerProfileRead:
     games_played = 0
 
     for score_log, game, event_day in db.execute(statement):
-        if game_affects_official_standings(game.game_type, game.status):
+        if game_affects_official_standings(game.game_type, game.play_status, game.result_status):
             total_score += score_log.delta
             games_played += 1
 
@@ -59,7 +60,8 @@ def build_player_profile(db: Session, player_id: int) -> PlayerProfileRead:
                 table_number=game.table_number,
                 game_number=game.game_number,
                 game_type=game.game_type,
-                game_status=game.status,
+                play_status=game.play_status,
+                result_status=game.result_status,
                 delta=score_log.delta,
                 balance_after=score_log.balance_after,
                 effective_status=score_log.effective_status,

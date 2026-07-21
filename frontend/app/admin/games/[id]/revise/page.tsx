@@ -178,7 +178,7 @@ export default function AdminGameRevisionPage() {
   );
 
   const validation = remoteValidation ?? localValidation;
-  const isReadOnly = !draft || !["submitted", "confirmed", "revised"].includes(draft.game.status);
+  const isReadOnly = !draft || !["submitted", "confirmed", "revised"].includes(draft.game.result_status);
   const metaLabelClass = getMetaLabelClass(language);
 
   function resetValidationFeedback() {
@@ -301,7 +301,7 @@ export default function AdminGameRevisionPage() {
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
                   <div className={metaLabelClass}>{t("common.currentStatus")}</div>
-                  <div className="mt-2 text-sm text-slate-700">{enumLabel("gameStatus", draft.game.status)}</div>
+                  <div className="mt-2 text-sm text-slate-700">{enumLabel("gamePlayStatus", draft.game.play_status)} · {enumLabel("gameResultStatus", draft.game.result_status)}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
                   <div className={metaLabelClass}>{t("resultEntry.submittedAt")}</div>

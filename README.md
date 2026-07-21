@@ -244,7 +244,8 @@ password123
 
 排行榜只统计：
 
-- `game.status IN (confirmed, revised)`
+- `game.result_status IN (confirmed, revised)`
+- `game.play_status = ended`
 - `game.game_type = official`
 - `score_logs.effective_status = effective`
 
@@ -254,12 +255,16 @@ password123
 - 修订时旧流水会 `voided`
 - 新流水会重新写入
 
-### 对局状态与审核并发
+### 对局与赛果双状态机
 
-- 新对局固定以 `draft` 创建；通用 `PATCH /games/{id}` 只编辑桌号、局号、版型、主持人、对局类型、时间和备注，不接受 `status`。
-- `in_progress`、`submitted`、`confirmed`、`revised` 和 reject 回到 `draft` 只能由对应的赛果业务 endpoint 产生。取消对局暂无专用 endpoint，不能通过通用 PATCH 绕过。
-- confirm、reject 和 revise 在同一个数据库 transaction 中使用 PostgreSQL `SELECT ... FOR UPDATE`。等待行锁期间如审核状态已改变，API 返回 `409 Conflict`。
-- confirm、reject 和 revise 会写入 `GameStatusHistory` 和 `AuditLog`。为保持本次改动范围，草稿首次保存与 submit 仍保留现有行为，暂不写这两类历史。
+- 新对局固定为 `play_status=scheduled`、`result_status=empty`，create/PATCH 均不接受状态或生命周期时间字段。
+- 对局状态为 `scheduled -> in_progress -> ended`，`scheduled/in_progress` 可由管理员取消；未进入审核的 ended 对局也可取消。`POST /games/{id}/start|end|cancel` 是对应的专用操作。
+- 赛果状态为 `empty -> draft -> submitted -> confirmed`，驳回走 `submitted -> rejected -> draft`，管理员可将 submitted/confirmed/revised 修订为 revised。
+- 首次保存草稿会兼容性自动执行 `scheduled -> in_progress`；提交 in-progress 草稿会在同一事务中自动结束对局。未来事件录入 UI 将显式 start。
+- 开始后冻结局号、版型与对局类型；取消后通用 PATCH 只读。已提交或生效赛果不能通过当前取消操作 void，需后续专用账本流程。
+- 所有状态操作使用 PostgreSQL `SELECT ... FOR UPDATE`，锁后重新校验双状态；冲突返回 `409`，失败请求不留下历史、审计或积分流水。
+- `GameStatusHistory` 使用 `status_scope=play|result` 与 `transition_key` 记录每个真实值变化；重复 revised 修订不重复写同值历史，但每次修订仍写 ResultConfirmation 和 AuditLog。
+- start、end、cancel、首次/驳回后保存、submit、reject、confirm 和 revise 均写 AuditLog。详见 `docs/architecture/game-state-machines.md`。
 
 ### ScoreLog 账本语义
 
@@ -275,7 +280,7 @@ password123
 - 赛果 API 仍扁平返回 `user_id` 与 `seat_number`，并新增 `participant_id`。后续 PUT/revise 应原样回传该 ID。
 - 草稿保存采用 participant reconcile：保留行原地更新，新增行创建，移除行单独删除；完全相同的重复保存会保持 participant 与 result ID 不变。
 - 显示名称在绑定用户时写入 snapshot，用户之后改名不会重写历史显示名。当前尚无游客创建 UI，也尚未冻结角色或版型定义。
-- 架构边界详见 `docs/architecture/game-participants.md`；M6.0D 将处理进行/审核状态拆分与历史版型快照。
+- 架构边界详见 `docs/architecture/game-participants.md`；M6.0D2 将处理不可变历史版型快照。
 
 ## 常用本地验证流程
 
@@ -290,7 +295,7 @@ password123
 
 1. 登录 `judge_user`
 2. 打开 `/judge/games`
-3. 进入一个 `draft` 或 `in_progress` 的对局
+3. 进入一个赛果状态为 `empty`、`draft` 或 `rejected` 且未取消的对局
 4. 保存草稿
 5. 提交赛果
 6. 确认页面变为只读

@@ -117,10 +117,10 @@ def test_concurrent_review_actions_allow_only_one_submitted_version_winner(
         select(func.count(GameStatusHistory.id)).where(
             GameStatusHistory.game_id == scenario.game_id
         )
-    ) == 1
+    ) == 5
     assert db_session.scalar(
         select(func.count(AuditLog.id)).where(AuditLog.entity_id == scenario.game_id)
-    ) == 1
+    ) == 3
     effective_logs = list(
         db_session.scalars(
             select(ScoreLog).where(
@@ -190,10 +190,10 @@ def test_concurrent_revisions_of_the_same_revised_version_allow_one_winner(
         select(func.count(GameStatusHistory.id)).where(
             GameStatusHistory.game_id == scenario.game_id
         )
-    ) == 3
+    ) == 6
     assert db_session.scalar(
         select(func.count(AuditLog.id)).where(AuditLog.entity_id == scenario.game_id)
-    ) == 3
+    ) == 5
     effective_logs = list(
         db_session.scalars(
             select(ScoreLog).where(

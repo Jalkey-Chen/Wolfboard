@@ -4,7 +4,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel
 
-from app.core.enums import GameStatus, GameType, ScoreLogEffectiveStatus
+from app.core.enums import GamePlayStatus, GameResultStatus, GameType, ScoreLogEffectiveStatus
 
 
 class PlayerProfileGameRead(BaseModel):
@@ -19,7 +19,8 @@ class PlayerProfileGameRead(BaseModel):
     table_number: int
     game_number: int
     game_type: GameType
-    game_status: GameStatus
+    play_status: GamePlayStatus
+    result_status: GameResultStatus
     delta: float
     balance_after: float
     effective_status: ScoreLogEffectiveStatus
@@ -35,4 +36,3 @@ class PlayerProfileRead(BaseModel):
     total_score: float
     games_played: int
     history: list[PlayerProfileGameRead]
-

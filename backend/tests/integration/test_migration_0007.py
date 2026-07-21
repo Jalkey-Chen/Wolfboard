@@ -1,6 +1,7 @@
 """Upgrade, backfill, constraint, and downgrade coverage for game participants."""
 
 from pathlib import Path
+from types import SimpleNamespace
 
 from alembic import command
 from alembic.config import Config
@@ -8,10 +9,6 @@ import pytest
 from sqlalchemy import Engine, inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
-
-from app.core.enums import GameStatus
-from tests.integration.result_support import create_additional_game, create_result_scenario
-
 
 pytestmark = pytest.mark.integration
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
@@ -66,6 +63,41 @@ def _insert_legacy_results(session: Session, game_id: int, user_one_id: int, use
     session.commit()
 
 
+def _insert_legacy_scenario(session: Session) -> SimpleNamespace:
+    session.execute(
+        text(
+            """
+            INSERT INTO users (id, username, display_name, password_hash)
+            VALUES (1, 'migration-admin', 'Migration Admin', 'unused'),
+                   (2, 'migration-judge', 'Migration Judge', 'unused'),
+                   (3, 'player-one', 'Player One', 'unused'),
+                   (4, 'player-two', 'Player Two', 'unused'),
+                   (5, 'replacement', 'Replacement Player', 'unused');
+            INSERT INTO seasons (id, name, start_date, end_date, created_by)
+            VALUES (1, 'Migration Season', '2026-01-01', '2026-12-31', 1);
+            INSERT INTO event_days (id, season_id, title, event_date, venue, created_by)
+            VALUES (1, 1, 'Migration Day', '2026-06-01', 'Migration Venue', 1);
+            INSERT INTO game_formats (id, format_name, format_key, player_count)
+            VALUES (1, 'Migration Format', 'migration-format', 3);
+            INSERT INTO games (
+                id, event_day_id, game_number, table_number, format_id,
+                judge_user_id, game_type, status, confirmed_at, confirmed_by
+            ) VALUES
+                (1, 1, 1, 1, 1, 2, 'OFFICIAL', 'CONFIRMED', now(), 1),
+                (2, 1, 2, 1, 1, 2, 'OFFICIAL', 'REVISED', now(), 1);
+            """
+        )
+    )
+    session.commit()
+    return SimpleNamespace(
+        game_id=1,
+        player_one_id=3,
+        player_two_id=4,
+        replacement_player_id=5,
+        judge_id=2,
+    )
+
+
 def test_migration_0007_backfills_and_round_trips_legacy_results(
     test_engine: Engine,
     test_session_factory: sessionmaker[Session],
@@ -78,8 +110,8 @@ def test_migration_0007_backfills_and_round_trips_legacy_results(
         command.downgrade(config, PREVIOUS_REVISION)
         assert "game_participants" not in inspect(test_engine).get_table_names()
         with test_session_factory() as session:
-            scenario = create_result_scenario(session, game_status=GameStatus.CONFIRMED)
-            empty_game_id = create_additional_game(session, scenario, status=GameStatus.REVISED)
+            scenario = _insert_legacy_scenario(session)
+            empty_game_id = 2
             _insert_legacy_results(
                 session,
                 scenario.game_id,

@@ -48,6 +48,7 @@ class User(Base):
     judged_games = relationship("Game", foreign_keys="Game.judge_user_id", back_populates="judge")
     submitted_games = relationship("Game", foreign_keys="Game.submitted_by", back_populates="submitter")
     confirmed_games = relationship("Game", foreign_keys="Game.confirmed_by", back_populates="confirmer")
+    cancelled_games = relationship("Game", foreign_keys="Game.cancelled_by", back_populates="canceller")
     game_participants = relationship("GameParticipant", back_populates="user")
     created_score_adjustments = relationship("ScoreAdjustment", back_populates="creator")
     score_logs = relationship("ScoreLog", back_populates="user")

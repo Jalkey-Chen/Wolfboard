@@ -28,13 +28,18 @@ export type ScoreAdjustmentType =
   | "conduct_penalty"
   | "judge_bonus"
   | "manual_adjustment";
-export type GameStatus =
-  | "draft"
+export type GamePlayStatus =
+  | "scheduled"
   | "in_progress"
-  | "submitted"
-  | "confirmed"
-  | "revised"
+  | "ended"
   | "cancelled";
+export type GameResultStatus =
+  | "empty"
+  | "draft"
+  | "submitted"
+  | "rejected"
+  | "confirmed"
+  | "revised";
 
 export type UserPayload = {
   id: number;
@@ -151,9 +156,13 @@ export type GameSummary = {
   judge_user_id: number;
   judge_display_name: string;
   game_type: GameType;
-  status: GameStatus;
+  play_status: GamePlayStatus;
+  result_status: GameResultStatus;
   started_at: string | null;
   ended_at: string | null;
+  cancelled_at: string | null;
+  cancelled_by: number | null;
+  cancellation_reason: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -292,7 +301,8 @@ export type PlayerProfileHistoryRecord = {
   table_number: number;
   game_number: number;
   game_type: GameType;
-  game_status: GameStatus;
+  play_status: GamePlayStatus;
+  result_status: GameResultStatus;
   delta: number;
   balance_after: number;
   effective_status: "pending" | "effective" | "voided";
@@ -361,8 +371,6 @@ export type GameCreatePayload = {
   judge_user_id: number;
   game_type: GameType;
   notes?: string | null;
-  started_at?: string | null;
-  ended_at?: string | null;
 };
 
 export type GameUpdatePayload = Partial<Omit<GameCreatePayload, "event_day_id">>;
@@ -675,11 +683,32 @@ export function updateGame(
 }
 
 
+export function startGame(token: string, gameId: number): Promise<GameDetail> {
+  return request<GameDetail>(`/games/${gameId}/start`, withAuth(token, { method: "POST" }));
+}
+
+
+export function endGame(token: string, gameId: number): Promise<GameDetail> {
+  return request<GameDetail>(`/games/${gameId}/end`, withAuth(token, { method: "POST" }));
+}
+
+
+export function cancelGame(token: string, gameId: number, reason: string): Promise<GameDetail> {
+  return request<GameDetail>(`/games/${gameId}/cancel`, withAuth(token, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  }));
+}
+
+
 export function getJudgeOwnedGames(
   token: string,
-  status?: GameStatus,
+  filters: { playStatus?: GamePlayStatus; resultStatus?: GameResultStatus } = {},
 ): Promise<GameSummary[]> {
-  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  const params = new URLSearchParams();
+  if (filters.playStatus) params.set("play_status", filters.playStatus);
+  if (filters.resultStatus) params.set("result_status", filters.resultStatus);
+  const query = params.size > 0 ? `?${params.toString()}` : "";
   return request<GameSummary[]>(`/judges/me/games${query}`, withAuth(token));
 }
 
