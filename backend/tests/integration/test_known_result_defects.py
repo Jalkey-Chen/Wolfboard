@@ -1,5 +1,7 @@
 """Executable specifications for known M6 prerequisite defects."""
 
+from datetime import datetime
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -22,29 +24,35 @@ from tests.integration.result_support import (
 pytestmark = pytest.mark.integration
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="M6.0B: draft replacement leaves the PUT response relationship cache stale until a new request.",
-)
 def test_draft_save_response_contains_the_persisted_rows(
     api_client: TestClient,
     db_session: Session,
 ) -> None:
     scenario = create_result_scenario(db_session)
+    payload = scenario.valid_draft()
     response = api_client.put(
         f"{API_PREFIX}/games/{scenario.game_id}/result-draft",
-        json=scenario.valid_draft(),
+        json=payload,
         headers=scenario.headers_for(scenario.judge_id),
     )
     assert response.status_code == 200
-    assert len(response.json()["players"]) == 2
-    assert len(response.json()["adjustments"]) == 1
+    body = response.json()
+    assert len(body["players"]) == 2
+    assert len(body["adjustments"]) == 1
+    assert [player["seat_number"] for player in body["players"]] == [1, 2]
+    assert [player["role_name"] for player in body["players"]] == ["Seer", "Werewolf"]
+    assert [player["final_score"] for player in body["players"]] == [1.25, -1.0]
+    assert body["adjustments"][0]["target_seat_number"] == 1
+    assert body["adjustments"][0]["delta"] == 0.25
+
+    restored = api_client.get(
+        f"{API_PREFIX}/games/{scenario.game_id}/result-draft",
+        headers=scenario.headers_for(scenario.judge_id),
+    )
+    assert restored.status_code == 200
+    assert restored.json() == body
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="M6.0B: rejection clears Game submission metadata before ResultConfirmation captures it.",
-)
 def test_rejection_preserves_original_submission_metadata(
     api_client: TestClient,
     db_session: Session,
@@ -70,11 +78,27 @@ def test_rejection_preserves_original_submission_metadata(
     assert confirmation.submitted_by == scenario.judge_id
     assert confirmation.submitted_at == original_submitted_at
 
+    resubmitted = api_client.post(
+        f"{API_PREFIX}/games/{scenario.game_id}/submit-result",
+        headers=scenario.headers_for(scenario.judge_id),
+    )
+    assert resubmitted.status_code == 200
+    new_submission = resubmitted.json()["game"]
+    assert new_submission["submitted_by"] == scenario.judge_id
+    assert original_submitted_at is not None
+    assert datetime.fromisoformat(new_submission["submitted_at"]) > original_submitted_at
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="M6.0B: generic game PATCH currently bypasses result state-transition services.",
-)
+    db_session.expire_all()
+    confirmations = list(
+        db_session.scalars(
+            select(ResultConfirmation).where(ResultConfirmation.game_id == scenario.game_id)
+        )
+    )
+    assert len(confirmations) == 1
+    assert confirmations[0].submitted_by == scenario.judge_id
+    assert confirmations[0].submitted_at == original_submitted_at
+
+
 def test_generic_patch_cannot_bypass_confirmed_result_state_machine(
     api_client: TestClient,
     db_session: Session,
@@ -88,10 +112,50 @@ def test_generic_patch_cannot_bypass_confirmed_result_state_machine(
         json={"status": GameStatus.DRAFT.value},
         headers=scenario.headers_for(scenario.admin_id),
     )
-    assert response.status_code == 400
+    assert response.status_code == 422
     db_session.expire_all()
     game = db_session.get(Game, scenario.game_id)
     assert game is not None and game.status == GameStatus.CONFIRMED
+
+    allowed_patch = api_client.patch(
+        f"{API_PREFIX}/games/{scenario.game_id}",
+        json={"notes": "Operational note", "table_number": 9},
+        headers=scenario.headers_for(scenario.admin_id),
+    )
+    assert allowed_patch.status_code == 200
+    assert allowed_patch.json()["notes"] == "Operational note"
+    assert allowed_patch.json()["table_number"] == 9
+    assert allowed_patch.json()["status"] == GameStatus.CONFIRMED.value
+
+
+def test_game_creation_only_allows_draft_initial_status(
+    api_client: TestClient,
+    db_session: Session,
+) -> None:
+    scenario = create_result_scenario(db_session)
+    payload = {
+        "event_day_id": scenario.event_day_id,
+        "game_number": 20,
+        "table_number": 1,
+        "format_id": scenario.format_id,
+        "judge_user_id": scenario.judge_id,
+        "game_type": GameType.OFFICIAL.value,
+    }
+
+    forbidden = api_client.post(
+        f"{API_PREFIX}/games",
+        json={**payload, "status": GameStatus.CONFIRMED.value},
+        headers=scenario.headers_for(scenario.admin_id),
+    )
+    assert forbidden.status_code == 422
+
+    created = api_client.post(
+        f"{API_PREFIX}/games",
+        json=payload,
+        headers=scenario.headers_for(scenario.admin_id),
+    )
+    assert created.status_code == 200
+    assert created.json()["status"] == GameStatus.DRAFT.value
 
 
 @pytest.mark.xfail(

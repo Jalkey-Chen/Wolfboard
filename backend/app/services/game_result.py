@@ -277,6 +277,10 @@ def save_game_result_draft(db: Session, game: Game, payload: GameResultDraftWrit
     replace_game_result_rows(db, game, payload, current_user)
     game.status = GameStatus.IN_PROGRESS
     db.commit()
+    # Bulk deletes and inserts do not rewrite an already-loaded relationship
+    # collection. Expire the aggregate before the eager-loading query so the
+    # PUT response reflects the rows that were just committed.
+    db.expire_all()
     return get_game_result_or_404(db, game.id)
 
 

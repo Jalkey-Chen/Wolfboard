@@ -83,6 +83,8 @@ def _write_result_confirmation(
     db: Session,
     *,
     game: Game,
+    submitted_by: int | None,
+    submitted_at: datetime | None,
     admin_user_id: int,
     confirmation_status: ResultConfirmationStatus,
     comment: str | None,
@@ -92,8 +94,8 @@ def _write_result_confirmation(
     db.add(
         ResultConfirmation(
             game_id=game.id,
-            submitted_by=game.submitted_by,
-            submitted_at=game.submitted_at,
+            submitted_by=submitted_by,
+            submitted_at=submitted_at,
             confirmed_by=admin_user_id,
             confirmed_at=datetime.now(timezone.utc),
             confirmation_status=confirmation_status,
@@ -124,6 +126,8 @@ def confirm_game_result(db: Session, game: Game, current_user: User, *, comment:
     _write_result_confirmation(
         db,
         game=game,
+        submitted_by=game.submitted_by,
+        submitted_at=game.submitted_at,
         admin_user_id=current_user.id,
         confirmation_status=ResultConfirmationStatus.APPROVED,
         comment=comment,
@@ -160,6 +164,8 @@ def reject_game_result(db: Session, game: Game, current_user: User, *, comment: 
     _ensure_status(game, {GameStatus.SUBMITTED}, "Only submitted games can be rejected.")
     old_snapshot = build_game_snapshot(game)
     previous_status = game.status
+    submitted_by = game.submitted_by
+    submitted_at = game.submitted_at
 
     game.status = GameStatus.DRAFT
     game.submitted_at = None
@@ -168,6 +174,8 @@ def reject_game_result(db: Session, game: Game, current_user: User, *, comment: 
     _write_result_confirmation(
         db,
         game=game,
+        submitted_by=submitted_by,
+        submitted_at=submitted_at,
         admin_user_id=current_user.id,
         confirmation_status=ResultConfirmationStatus.REJECTED,
         comment=comment,
@@ -229,6 +237,8 @@ def revise_game_result(db: Session, game: Game, payload: GameRevisionWrite, curr
     _write_result_confirmation(
         db,
         game=game,
+        submitted_by=game.submitted_by,
+        submitted_at=game.submitted_at,
         admin_user_id=current_user.id,
         confirmation_status=ResultConfirmationStatus.REVISED,
         comment=payload.reason,

@@ -358,7 +358,6 @@ export type GameCreatePayload = {
   format_id: number;
   judge_user_id: number;
   game_type: GameType;
-  status: GameStatus;
   notes?: string | null;
   started_at?: string | null;
   ended_at?: string | null;
