@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum as SqlEnum, Float, ForeignKey, String, Text, func
+from sqlalchemy import DateTime, Enum as SqlEnum, Float, ForeignKey, Index, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.enums import ScoreLogEffectiveStatus, ScoreLogSourceType
@@ -18,6 +18,16 @@ class ScoreLog(Base):
     """
 
     __tablename__ = "score_logs"
+    __table_args__ = (
+        Index(
+            "uq_score_logs_effective_game_user_source",
+            "game_id",
+            "user_id",
+            "source_type",
+            unique=True,
+            postgresql_where=text("effective_status = 'EFFECTIVE'"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
@@ -45,5 +55,3 @@ class ScoreLog(Base):
 
     user = relationship("User", back_populates="score_logs")
     game = relationship("Game", back_populates="score_logs")
-
-

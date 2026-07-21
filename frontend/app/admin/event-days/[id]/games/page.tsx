@@ -23,7 +23,6 @@ import {
   updateGame,
   type EventDayDetail,
   type GameCreatePayload,
-  type GameStatus,
   type GameSummary,
   type GameType,
   type JudgeOptionRecord,
@@ -33,7 +32,6 @@ import { useAuthenticatedSession } from "@/lib/use-authenticated-session";
 
 
 const gameTypes: GameType[] = ["official", "fun", "practice"];
-const gameStatuses: GameStatus[] = ["draft", "in_progress", "submitted", "confirmed", "revised", "cancelled"];
 
 
 type FormState = {
@@ -42,7 +40,6 @@ type FormState = {
   format_id: string;
   judge_user_id: string;
   game_type: GameType;
-  status: GameStatus;
   notes: string;
   started_at: string;
   ended_at: string;
@@ -58,7 +55,6 @@ function emptyFormState(): FormState {
     format_id: "",
     judge_user_id: "",
     game_type: "official",
-    status: "draft",
     notes: "",
     started_at: "",
     ended_at: "",
@@ -79,7 +75,6 @@ function buildFormState(game: GameSummary | null): FormState {
     format_id: String(game.format_id),
     judge_user_id: String(game.judge_user_id),
     game_type: game.game_type,
-    status: game.status,
     notes: game.notes ?? "",
     started_at: toDateTimeLocalValue(game.started_at),
     ended_at: toDateTimeLocalValue(game.ended_at),
@@ -160,7 +155,6 @@ export default function AdminEventDayGamesPage() {
       format_id: Number(formState.format_id),
       judge_user_id: Number(formState.judge_user_id),
       game_type: formState.game_type,
-      status: formState.status,
       notes: formState.notes || null,
       started_at: formState.started_at || null,
       ended_at: formState.ended_at || null,
@@ -176,7 +170,6 @@ export default function AdminEventDayGamesPage() {
           format_id: payload.format_id,
           judge_user_id: payload.judge_user_id,
           game_type: payload.game_type,
-          status: payload.status,
           notes: payload.notes,
           started_at: payload.started_at,
           ended_at: payload.ended_at,
@@ -344,17 +337,6 @@ export default function AdminEventDayGamesPage() {
               {gameTypes.map((gameType) => (
                 <option key={gameType} value={gameType}>
                   {enumLabel("gameType", gameType)}
-                </option>
-              ))}
-            </select>
-            <select
-              className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
-              onChange={(event) => setFormState((current) => ({ ...current, status: event.target.value as GameStatus }))}
-              value={formState.status}
-            >
-              {gameStatuses.map((status) => (
-                <option key={status} value={status}>
-                  {enumLabel("gameStatus", status)}
                 </option>
               ))}
             </select>

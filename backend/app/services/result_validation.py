@@ -43,6 +43,18 @@ def validate_game_result_payload(
 
     seat_values = [player.seat_number for player in players if player.seat_number is not None]
     user_values = [player.user_id for player in players if player.user_id is not None]
+    participant_values = [player.participant_id for player in players if player.participant_id is not None]
+
+    duplicate_participants = [participant_id for participant_id, count in Counter(participant_values).items() if count > 1]
+    if duplicate_participants:
+        errors.append(
+            _message(
+                "duplicate_participant_ids",
+                "The same participant cannot appear more than once in a result draft: "
+                f"{', '.join(str(participant_id) for participant_id in sorted(duplicate_participants))}.",
+                "players",
+            )
+        )
 
     duplicate_seats = [seat for seat, count in Counter(seat_values).items() if count > 1]
     if duplicate_seats:

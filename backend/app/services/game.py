@@ -134,7 +134,7 @@ def create_game(db: Session, payload: GameCreate) -> Game:
         format_id=payload.format_id,
         judge_user_id=payload.judge_user_id,
         game_type=payload.game_type,
-        status=payload.status,
+        status=GameStatus.DRAFT,
         notes=payload.notes,
         started_at=payload.started_at,
         ended_at=payload.ended_at,

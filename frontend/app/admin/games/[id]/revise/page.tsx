@@ -47,6 +47,7 @@ function nextRowId(prefix: string): string {
 function createEmptyPlayerRow(): EditableGameResultPlayer {
   return {
     row_id: nextRowId("player"),
+    participant_id: null,
     user_id: null,
     seat_number: null,
     role_name: "",
@@ -71,7 +72,8 @@ function createEmptyAdjustmentRow(): EditableGameResultAdjustment {
 
 function toEditablePlayers(response: GameResultDraftResponse): EditableGameResultPlayer[] {
   return response.players.map((player) => ({
-    row_id: `player-${player.id}`,
+    row_id: `participant-${player.participant_id}`,
+    participant_id: player.participant_id,
     user_id: player.user_id,
     seat_number: player.seat_number,
     role_name: player.role_name ?? "",
@@ -194,6 +196,7 @@ export default function AdminGameRevisionPage() {
     try {
       const response = await reviseGameResult(token, gameId, {
         players: playerRows.map((player) => ({
+          participant_id: player.participant_id,
           user_id: player.user_id,
           seat_number: player.seat_number,
           role_name: player.role_name.trim() || null,

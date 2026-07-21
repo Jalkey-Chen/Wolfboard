@@ -41,10 +41,11 @@ class GameCreate(BaseModel):
     format_id: int
     judge_user_id: int
     game_type: GameType = GameType.OFFICIAL
-    status: GameStatus = GameStatus.DRAFT
     notes: str | None = None
     started_at: datetime | None = None
     ended_at: datetime | None = None
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class GameUpdate(BaseModel):
@@ -55,10 +56,11 @@ class GameUpdate(BaseModel):
     format_id: int | None = None
     judge_user_id: int | None = None
     game_type: GameType | None = None
-    status: GameStatus | None = None
     notes: str | None = None
     started_at: datetime | None = None
     ended_at: datetime | None = None
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class GameSummary(BaseModel):

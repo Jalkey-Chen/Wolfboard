@@ -254,6 +254,29 @@ password123
 - 修订时旧流水会 `voided`
 - 新流水会重新写入
 
+### 对局状态与审核并发
+
+- 新对局固定以 `draft` 创建；通用 `PATCH /games/{id}` 只编辑桌号、局号、版型、主持人、对局类型、时间和备注，不接受 `status`。
+- `in_progress`、`submitted`、`confirmed`、`revised` 和 reject 回到 `draft` 只能由对应的赛果业务 endpoint 产生。取消对局暂无专用 endpoint，不能通过通用 PATCH 绕过。
+- confirm、reject 和 revise 在同一个数据库 transaction 中使用 PostgreSQL `SELECT ... FOR UPDATE`。等待行锁期间如审核状态已改变，API 返回 `409 Conflict`。
+- confirm、reject 和 revise 会写入 `GameStatusHistory` 和 `AuditLog`。为保持本次改动范围，草稿首次保存与 submit 仍保留现有行为，暂不写这两类历史。
+
+### ScoreLog 账本语义
+
+- 已确认或修订的 official、fun 和 practice 对局都可以保留 `ScoreLog.delta`。
+- `effective_status=effective` 表示当前有效的流水版本；同一 `game_id + user_id + source_type` 最多只有一条 effective 流水，由 PostgreSQL partial unique index 保护。
+- `balance_after` 表示该玩家当时的正式积分余额，与排行榜口径一致。只有 official 对局改变余额；fun 和 practice 流水保留 delta，但不增减正式余额。
+- 修订会将该局旧 effective 流水改为 `voided`，为新赛果写入 effective 流水，并对旧新玩家并集重算该赛季后续余额。
+
+### 稳定局内参与者
+
+- `GameParticipant` 是一局内的稳定身份，保存可变的 `user_id`、座位号和比赛时显示名称快照；未来事件 actor/target 将以它作为引用对象。
+- `GamePlayer` 只保存角色、阵营、最终状态、胜负、积分、备注和调整项，不再重复保存 user 或 seat。
+- 赛果 API 仍扁平返回 `user_id` 与 `seat_number`，并新增 `participant_id`。后续 PUT/revise 应原样回传该 ID。
+- 草稿保存采用 participant reconcile：保留行原地更新，新增行创建，移除行单独删除；完全相同的重复保存会保持 participant 与 result ID 不变。
+- 显示名称在绑定用户时写入 snapshot，用户之后改名不会重写历史显示名。当前尚无游客创建 UI，也尚未冻结角色或版型定义。
+- 架构边界详见 `docs/architecture/game-participants.md`；M6.0D 将处理进行/审核状态拆分与历史版型快照。
+
 ## 常用本地验证流程
 
 ### 1. 登录验证
@@ -396,16 +419,9 @@ uv run pytest -q
 - Backend：`uv sync --frozen --dev`、CI PostgreSQL service、`alembic upgrade head`、`pytest -q`。
 - CI 不运行 seed，也不需要真实 secrets。
 
-### 已知严格 xfail
+### 已知缺陷基线
 
-以下 M6 前置缺陷已由 `xfail(strict=True)` 记录，不会被普通 skip 隐藏：
-
-- `M6.0B`：保存草稿的 PUT 响应在新请求前可能保留过期的玩家关系缓存。
-- `M6.0B`：驳回前清空了 `submitted_by/submitted_at`，导致 `ResultConfirmation` 丢失原提交信息。
-- `M6.0B`：通用 `PATCH /games/{id}` 可绕过赛果状态转换服务。
-- `M6.0B`：重复保存草稿会删除并重建 `GamePlayer`，使 ID 变化。
-- `M6.0C`：非正式局的有效 `ScoreLog` 会参与赛季 `balance_after` 重算。
-- `M6.0C`：修订移除玩家时，替换行与该玩家后续流水的余额重算仍需统一修正。
+M6.0C 已将最后一条 strict xfail（重复保存草稿导致 `GamePlayer.id` 变化）转为普通通过测试。当前测试套件为 `0 xfailed`。
 
 ## 当前未实现内容
 

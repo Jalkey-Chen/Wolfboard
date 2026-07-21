@@ -207,6 +207,12 @@ def test_reject_is_admin_only_and_writes_review_history_and_audit(
     assert history.changed_by == scenario.admin_id
     assert audit is not None and audit.action_type == "reject"
     assert audit.reason == "Please correct this result"
+    assert audit.old_value_json["game"]["status"] == GameStatus.SUBMITTED.value
+    assert audit.old_value_json["game"]["submitted_by"] == scenario.judge_id
+    assert audit.old_value_json["game"]["submitted_at"] is not None
+    assert audit.new_value_json["game"]["status"] == GameStatus.DRAFT.value
+    assert audit.new_value_json["game"]["submitted_by"] is None
+    assert audit.new_value_json["game"]["submitted_at"] is None
 
 
 def test_confirm_is_admin_only_creates_scores_and_official_leaderboard_entries(
@@ -258,6 +264,16 @@ def test_confirm_is_admin_only_creates_scores_and_official_leaderboard_entries(
     assert db_session.scalar(
         select(func.count(AuditLog.id)).where(AuditLog.entity_id == scenario.game_id)
     ) == 1
+    audit = db_session.scalar(
+        select(AuditLog).where(AuditLog.entity_id == scenario.game_id)
+    )
+    assert audit is not None
+    assert audit.old_value_json["game"]["status"] == GameStatus.SUBMITTED.value
+    assert audit.new_value_json["game"]["status"] == GameStatus.CONFIRMED.value
+    assert len(audit.new_value_json["score_logs"]) == 2
+    assert {
+        score_log["effective_status"] for score_log in audit.new_value_json["score_logs"]
+    } == {ScoreLogEffectiveStatus.EFFECTIVE.value}
 
     fun_game_id = create_additional_game(db_session, scenario, game_type=GameType.FUN)
     save_and_submit(api_client, scenario, fun_game_id)

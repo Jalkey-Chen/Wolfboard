@@ -195,6 +195,7 @@ export type SelectablePlayerRecord = {
 };
 
 export type GameResultPlayerDraftPayload = {
+  participant_id?: number | null;
   user_id: number | null;
   seat_number: number | null;
   role_name: string | null;
@@ -223,6 +224,7 @@ export type GameRevisionWritePayload = GameResultDraftWritePayload & {
 export type GameResultPlayerRecord = {
   id: number;
   game_id: number;
+  participant_id: number;
   user_id: number | null;
   username: string;
   display_name: string;
@@ -358,7 +360,6 @@ export type GameCreatePayload = {
   format_id: number;
   judge_user_id: number;
   game_type: GameType;
-  status: GameStatus;
   notes?: string | null;
   started_at?: string | null;
   ended_at?: string | null;
