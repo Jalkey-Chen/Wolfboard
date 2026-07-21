@@ -20,6 +20,11 @@ type UseAuthenticatedSessionOptions = {
 };
 
 
+function isRoleKey(value: string): value is RoleKey {
+  return value === "admin" || value === "judge" || value === "player";
+}
+
+
 export function useAuthenticatedSession(options: UseAuthenticatedSessionOptions = {}) {
   const router = useRouter();
   const { t } = useI18n();
@@ -27,12 +32,13 @@ export function useAuthenticatedSession(options: UseAuthenticatedSessionOptions 
   const [profile, setProfile] = useState<CurrentUserResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const requiredRole = options.requiredRole;
   const requiredRolesKey = (options.requiredRoles ?? []).join(",");
 
   useEffect(() => {
-    const requiredRoles = options.requiredRoles ?? (
-      options.requiredRole ? [options.requiredRole] : []
-    );
+    const requiredRoles = requiredRolesKey
+      ? requiredRolesKey.split(",").filter(isRoleKey)
+      : requiredRole ? [requiredRole] : [];
     const storedToken = getStoredAccessToken();
     if (!storedToken) {
       router.replace("/login");
@@ -61,7 +67,7 @@ export function useAuthenticatedSession(options: UseAuthenticatedSessionOptions 
         setIsLoading(false);
         router.replace("/login");
       });
-  }, [options.requiredRole, requiredRolesKey, router, t]);
+  }, [requiredRole, requiredRolesKey, router, t]);
 
   return {
     token,

@@ -105,12 +105,12 @@ export default function AdminEventDayGamesPage() {
       return;
     }
 
-    async function loadPage() {
+    async function loadPage(authToken: string) {
       try {
         const [eventDayResponse, formatResponse, judgeResponse] = await Promise.all([
-          getEventDay(token, eventDayId),
-          getFormats(token),
-          getJudgeOptions(token),
+          getEventDay(authToken, eventDayId),
+          getFormats(authToken),
+          getJudgeOptions(authToken),
         ]);
         setEventDay(eventDayResponse);
         setFormats(formatResponse);
@@ -120,7 +120,7 @@ export default function AdminEventDayGamesPage() {
       }
     }
 
-    void loadPage();
+    void loadPage(token);
   }, [eventDayId, profile, t, token]);
 
   const selectedGame = useMemo(
