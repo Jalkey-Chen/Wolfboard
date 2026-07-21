@@ -4,12 +4,13 @@ from collections import defaultdict
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.enums import GameStatus, ScoreAdjustmentType
 from app.models.event_day import EventDay
 from app.models.game import Game
+from app.models.game_participant import GameParticipant
 from app.models.game_player import GamePlayer
 from app.models.game_format import GameFormat
 from app.models.registration import Registration
@@ -22,6 +23,7 @@ from app.schemas.game_result import (
     GameResultAdjustmentRead,
     GameResultDraftRead,
     GameResultDraftWrite,
+    GameResultPlayerInput,
     GameResultPlayerRead,
     SelectablePlayerRead,
     ValidationSummary,
@@ -35,7 +37,9 @@ GAME_RESULT_LOAD_OPTIONS = (
     selectinload(Game.event_day).selectinload(EventDay.registrations).selectinload(Registration.user),
     selectinload(Game.format).selectinload(GameFormat.format_roles),
     selectinload(Game.judge).selectinload(User.user_roles).selectinload(UserRole.role),
-    selectinload(Game.players).selectinload(GamePlayer.user),
+    selectinload(Game.participants).selectinload(GameParticipant.user),
+    selectinload(Game.participants).selectinload(GameParticipant.result).selectinload(GamePlayer.adjustments),
+    selectinload(Game.players).selectinload(GamePlayer.participant).selectinload(GameParticipant.user),
     selectinload(Game.players).selectinload(GamePlayer.adjustments),
 )
 
@@ -48,6 +52,42 @@ def get_game_result_or_404(db: Session, game_id: int) -> Game:
     if game is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Game not found.")
     return game
+
+
+def _lock_current_result_draft(db: Session, game: Game) -> Game:
+    """Serialize full-draft reconciles and reload participant identity state."""
+
+    expected_status = game.status
+    statement = (
+        select(Game)
+        .options(*GAME_RESULT_LOAD_OPTIONS)
+        .where(Game.id == game.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    locked_game = db.scalar(statement)
+    if locked_game is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Game not found.")
+    if locked_game.status != expected_status:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The game result changed while this draft save was waiting. Reload and try again.",
+        )
+    return locked_game
+
+
+def _sorted_players(game: Game) -> list[GamePlayer]:
+    """Return result rows in stable seat-first display order."""
+
+    return sorted(
+        game.players,
+        key=lambda player: (
+            player.seat_number is None,
+            player.seat_number if player.seat_number is not None else 0,
+            player.participant_id,
+        ),
+    )
 
 
 def ensure_can_view_game_result(game: Game, current_user: User) -> None:
@@ -110,7 +150,7 @@ def _build_selectable_players(game: Game) -> list[SelectablePlayerRead]:
             check_in_status=registration.check_in_status.value,
         )
 
-    for game_player in game.players:
+    for game_player in _sorted_players(game):
         if game_player.user_id is None or game_player.user_id == game.judge_user_id:
             continue
         options.setdefault(
@@ -132,6 +172,7 @@ def _build_validation(game: Game) -> tuple[GameResultDraftWrite, ValidationSumma
         players=[
             {
                 "user_id": player.user_id,
+                "participant_id": player.participant_id,
                 "seat_number": player.seat_number,
                 "role_name": player.role_name,
                 "faction": player.faction,
@@ -139,7 +180,7 @@ def _build_validation(game: Game) -> tuple[GameResultDraftWrite, ValidationSumma
                 "is_winner": player.is_winner,
                 "remarks": player.remarks,
             }
-            for player in game.players
+            for player in _sorted_players(game)
         ],
         adjustments=[
             {
@@ -148,7 +189,7 @@ def _build_validation(game: Game) -> tuple[GameResultDraftWrite, ValidationSumma
                 "delta": adjustment.delta,
                 "reason": adjustment.reason,
             }
-            for player in game.players
+            for player in _sorted_players(game)
             for adjustment in player.adjustments
             if adjustment.target_seat_number is not None
         ],
@@ -163,10 +204,10 @@ def build_game_result_response(game: Game, current_user: User) -> GameResultDraf
     _ = payload
     return GameResultDraftRead(
         game=_build_game_detail(game, current_user),
-        players=[GameResultPlayerRead.model_validate(player) for player in game.players],
+        players=[GameResultPlayerRead.model_validate(player) for player in _sorted_players(game)],
         adjustments=[
             GameResultAdjustmentRead.model_validate(adjustment)
-            for player in game.players
+            for player in _sorted_players(game)
             for adjustment in player.adjustments
         ],
         format_roles=[FormatRoleRead.model_validate(format_role) for format_role in game.format.format_roles],
@@ -195,62 +236,164 @@ def _collect_adjustment_notes(adjustments: list[ScoreAdjustment]) -> tuple[str |
     )
 
 
-def replace_game_result_rows(db: Session, game: Game, payload: GameResultDraftWrite, current_user: User) -> None:
-    """Replace all persisted player rows and score adjustments for a game."""
+def _participant_conflict(detail: str) -> None:
+    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
 
-    # The draft endpoint follows a full-replacement model so the frontend does
-    # not need row-level patch semantics while judges are editing at the table.
-    db.execute(delete(ScoreAdjustment).where(ScoreAdjustment.game_player_id.in_(select(GamePlayer.id).where(GamePlayer.game_id == game.id))))
-    db.execute(delete(GamePlayer).where(GamePlayer.game_id == game.id))
-    db.flush()
 
-    players_by_seat: dict[int, GamePlayer] = {}
-    created_players: list[GamePlayer] = []
+def _resolve_participants(
+    db: Session,
+    game: Game,
+    payload: GameResultDraftWrite,
+) -> list[tuple[GameResultPlayerInput, GameParticipant | None]]:
+    """Resolve write rows to existing participants without guessing through ambiguity."""
+
+    existing = list(game.participants)
+    by_id = {participant.id: participant for participant in existing}
+    by_user = {participant.user_id: participant for participant in existing if participant.user_id is not None}
+    by_seat = {participant.seat_number: participant for participant in existing if participant.seat_number is not None}
+    explicitly_referenced_ids = {
+        player.participant_id
+        for player in payload.players
+        if player.participant_id is not None
+    }
+    resolved: list[tuple[GameResultPlayerInput, GameParticipant | None]] = []
+    used_ids: set[int] = set()
 
     for player_input in payload.players:
-        game_player = GamePlayer(
-            game_id=game.id,
-            user_id=player_input.user_id,
-            seat_number=player_input.seat_number,
-            role_name=player_input.role_name,
-            faction=player_input.faction,
-            final_status=player_input.final_status,
-            is_winner=player_input.is_winner,
-            remarks=player_input.remarks,
-            base_score=calculate_base_score(player_input.faction, player_input.is_winner),
-            adjustment_score=0.0,
-            final_score=calculate_base_score(player_input.faction, player_input.is_winner),
+        participant: GameParticipant | None
+        if player_input.participant_id is not None:
+            participant = by_id.get(player_input.participant_id)
+            if participant is None:
+                referenced = db.get(GameParticipant, player_input.participant_id)
+                if referenced is not None:
+                    _participant_conflict("Participant does not belong to this game.")
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Participant does not exist.",
+                )
+        else:
+            user_match = by_user.get(player_input.user_id) if player_input.user_id is not None else None
+            seat_match = by_seat.get(player_input.seat_number) if player_input.seat_number is not None else None
+            if user_match is not None and user_match.id in explicitly_referenced_ids:
+                user_match = None
+            if seat_match is not None and seat_match.id in explicitly_referenced_ids:
+                seat_match = None
+            if user_match is not None and seat_match is not None and user_match.id != seat_match.id:
+                _participant_conflict(
+                    "User and seat identify different participants. Reload the result before saving."
+                )
+            participant = user_match or seat_match
+
+        if participant is not None:
+            if participant.id in used_ids:
+                _participant_conflict("The same participant was resolved more than once.")
+            used_ids.add(participant.id)
+        resolved.append((player_input, participant))
+
+    return resolved
+
+
+def reconcile_game_result_rows(db: Session, game: Game, payload: GameResultDraftWrite, current_user: User) -> None:
+    """Reconcile a full draft while preserving retained participant and result IDs."""
+
+    resolved = _resolve_participants(db, game, payload)
+    requested_user_ids = {player.user_id for player in payload.players if player.user_id is not None}
+    users_by_id = {
+        user.id: user
+        for user in db.scalars(select(User).where(User.id.in_(requested_user_ids)))
+    }
+    missing_user_ids = requested_user_ids - users_by_id.keys()
+    if missing_user_ids:
+        _participant_conflict(
+            f"Unknown user IDs: {', '.join(str(user_id) for user_id in sorted(missing_user_ids))}."
         )
-        db.add(game_player)
-        db.flush()
-        created_players.append(game_player)
+
+    retained_ids = {participant.id for _, participant in resolved if participant is not None}
+    removed_participants = [participant for participant in game.participants if participant.id not in retained_ids]
+
+    # Clear changing unique values in one flush so swaps and cycles cannot trip
+    # the final-state uniqueness constraints halfway through the reconcile.
+    for player_input, participant in resolved:
+        if participant is None:
+            continue
+        if participant.user_id != player_input.user_id:
+            participant.user_id = None
+        if participant.seat_number != player_input.seat_number:
+            participant.seat_number = None
+    for participant in removed_participants:
+        participant.user_id = None
+        participant.seat_number = None
+    db.flush()
+
+    resolved_participants: list[tuple[GameResultPlayerInput, GameParticipant]] = []
+    for player_input, participant in resolved:
+        user = users_by_id.get(player_input.user_id)
+        if participant is None:
+            participant = GameParticipant(
+                game_id=game.id,
+                user_id=player_input.user_id,
+                seat_number=player_input.seat_number,
+                display_name_snapshot=user.display_name if user is not None else None,
+            )
+            db.add(participant)
+        else:
+            previous_user_id = participant.user_id
+            participant.user_id = player_input.user_id
+            participant.seat_number = player_input.seat_number
+            if user is not None and (previous_user_id != player_input.user_id or participant.display_name_snapshot is None):
+                participant.display_name_snapshot = user.display_name
+        resolved_participants.append((player_input, participant))
+
+    db.flush()
+    for participant in removed_participants:
+        db.delete(participant)
+
+    players_by_seat: dict[int, GamePlayer] = {}
+    result_rows: list[GamePlayer] = []
+    for player_input, participant in resolved_participants:
+        game_player = participant.result
+        if game_player is None:
+            game_player = GamePlayer(game_id=game.id, participant=participant)
+            db.add(game_player)
+        game_player.role_name = player_input.role_name
+        game_player.faction = player_input.faction
+        game_player.final_status = player_input.final_status
+        game_player.is_winner = player_input.is_winner
+        game_player.remarks = player_input.remarks
+        game_player.base_score = calculate_base_score(player_input.faction, player_input.is_winner)
+        game_player.adjustment_score = 0.0
+        game_player.final_score = game_player.base_score
+        result_rows.append(game_player)
         if player_input.seat_number is not None:
             players_by_seat[player_input.seat_number] = game_player
 
+    db.flush()
+    # Adjustment rows remain replace-on-save because they have no client-facing
+    # identity contract; replacing only these children preserves GamePlayer IDs.
+    for game_player in result_rows:
+        game_player.adjustments.clear()
+    db.flush()
+
     adjustments_by_player_id: dict[int, list[ScoreAdjustment]] = defaultdict(list)
     deltas_by_player_id: dict[int, list[float]] = defaultdict(list)
-
     for adjustment_input in payload.adjustments:
-        # Adjustments are currently targeted by seat number because seat numbers
-        # are stable in the judge workflow even before rows have persistent ids.
         target_player = players_by_seat[adjustment_input.target_seat_number]
         adjustment = ScoreAdjustment(
-            game_player_id=target_player.id,
             adjustment_type=adjustment_input.adjustment_type,
             delta=adjustment_input.delta,
             reason=adjustment_input.reason,
             created_by=current_user.id,
         )
-        db.add(adjustment)
+        target_player.adjustments.append(adjustment)
         adjustments_by_player_id[target_player.id].append(adjustment)
         deltas_by_player_id[target_player.id].append(adjustment_input.delta)
 
-    for player in created_players:
+    for player in result_rows:
         adjustment_score = calculate_adjustment_score(deltas_by_player_id[player.id])
         player.adjustment_score = adjustment_score
         player.final_score = calculate_final_score(player.base_score, adjustment_score)
         player.judge_bonus_note, player.penalty_note = _collect_adjustment_notes(adjustments_by_player_id[player.id])
-        db.add(player)
+    db.flush()
 
 
 def _raise_validation_error(message: str, validation: ValidationSummary) -> None:
@@ -267,19 +410,19 @@ def _raise_validation_error(message: str, validation: ValidationSummary) -> None
 
 
 def save_game_result_draft(db: Session, game: Game, payload: GameResultDraftWrite, current_user: User) -> Game:
-    """Replace the current draft rows for a game and mark it in progress."""
+    """Reconcile the current draft snapshot and mark the game in progress."""
 
+    game = _lock_current_result_draft(db, game)
     ensure_can_edit_game_result(game, current_user)
     validation = validate_game_result_payload(game, payload, submit_mode=False)
     if validation.errors:
         _raise_validation_error("Draft validation failed.", validation)
 
-    replace_game_result_rows(db, game, payload, current_user)
+    reconcile_game_result_rows(db, game, payload, current_user)
     game.status = GameStatus.IN_PROGRESS
     db.commit()
-    # Bulk deletes and inserts do not rewrite an already-loaded relationship
-    # collection. Expire the aggregate before the eager-loading query so the
-    # PUT response reflects the rows that were just committed.
+    # Return a newly loaded aggregate so relationship order and replaced
+    # adjustment children exactly match the committed draft.
     db.expire_all()
     return get_game_result_or_404(db, game.id)
 

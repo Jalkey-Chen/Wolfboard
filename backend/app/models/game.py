@@ -69,11 +69,18 @@ class Game(Base):
     judge = relationship("User", foreign_keys=[judge_user_id], back_populates="judged_games")
     submitter = relationship("User", foreign_keys=[submitted_by], back_populates="submitted_games")
     confirmer = relationship("User", foreign_keys=[confirmed_by], back_populates="confirmed_games")
+    participants = relationship(
+        "GameParticipant",
+        back_populates="game",
+        cascade="all, delete-orphan",
+        order_by="GameParticipant.seat_number.asc().nullslast(), GameParticipant.id.asc()",
+    )
     players = relationship(
         "GamePlayer",
         back_populates="game",
-        cascade="all, delete-orphan",
-        order_by="GamePlayer.seat_number.asc()",
+        order_by="GamePlayer.id.asc()",
+        overlaps="participant,result",
+        viewonly=True,
     )
     score_logs = relationship(
         "ScoreLog",

@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum as SqlEnum, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import DateTime, Enum as SqlEnum, Float, ForeignKey, ForeignKeyConstraint, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.enums import GamePlayerFaction, GamePlayerFinalStatus
@@ -19,14 +19,18 @@ class GamePlayer(Base):
 
     __tablename__ = "game_players"
     __table_args__ = (
-        UniqueConstraint("game_id", "seat_number", name="uq_game_players_game_id_seat_number"),
-        UniqueConstraint("game_id", "user_id", name="uq_game_players_game_id_user_id"),
+        ForeignKeyConstraint(
+            ["participant_id", "game_id"],
+            ["game_participants.id", "game_participants.game_id"],
+            name="fk_game_players_participant_game",
+            ondelete="CASCADE",
+        ),
+        UniqueConstraint("participant_id", name="uq_game_players_participant_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     game_id: Mapped[int] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"), index=True)
-    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=True, index=True)
-    seat_number: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    participant_id: Mapped[int] = mapped_column(nullable=False, index=True)
     role_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     faction: Mapped[GamePlayerFaction | None] = mapped_column(
         SqlEnum(GamePlayerFaction, name="game_player_faction", native_enum=False),
@@ -58,8 +62,8 @@ class GamePlayer(Base):
         nullable=False,
     )
 
-    game = relationship("Game", back_populates="players")
-    user = relationship("User", back_populates="game_players")
+    game = relationship("Game", back_populates="players", overlaps="participant,result", viewonly=True)
+    participant = relationship("GameParticipant", back_populates="result", overlaps="game,players")
     adjustments = relationship(
         "ScoreAdjustment",
         back_populates="game_player",
@@ -71,10 +75,26 @@ class GamePlayer(Base):
     def username(self) -> str:
         """Expose the related username for result payloads."""
 
-        return self.user.username if self.user is not None else ""
+        if self.participant is None or self.participant.user is None:
+            return ""
+        return self.participant.user.username
 
     @property
     def display_name(self) -> str:
         """Expose the related display name for result payloads."""
 
-        return self.user.display_name if self.user is not None else ""
+        if self.participant is None:
+            return ""
+        return self.participant.display_name_snapshot or ""
+
+    @property
+    def user_id(self) -> int | None:
+        """Project the participant's account binding for API compatibility."""
+
+        return self.participant.user_id if self.participant is not None else None
+
+    @property
+    def seat_number(self) -> int | None:
+        """Project the participant's current seat for API compatibility."""
+
+        return self.participant.seat_number if self.participant is not None else None

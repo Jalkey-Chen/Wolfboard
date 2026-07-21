@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models.event_day import EventDay
 from app.models.game import Game
+from app.models.game_participant import GameParticipant
 from app.models.game_player import GamePlayer
 from app.models.score_log import ScoreLog
 from app.models.season import Season
@@ -25,8 +26,18 @@ def get_season_leaderboard(db: Session, season_id: int) -> list[LeaderboardEntry
         .join(ScoreLog.game)
         .join(Game.event_day)
         .outerjoin(
+            GameParticipant,
+            and_(
+                GameParticipant.game_id == ScoreLog.game_id,
+                GameParticipant.user_id == ScoreLog.user_id,
+            ),
+        )
+        .outerjoin(
             GamePlayer,
-            and_(GamePlayer.game_id == ScoreLog.game_id, GamePlayer.user_id == ScoreLog.user_id),
+            and_(
+                GamePlayer.participant_id == GameParticipant.id,
+                GamePlayer.game_id == GameParticipant.game_id,
+            ),
         )
         .where(
             EventDay.season_id == season_id,

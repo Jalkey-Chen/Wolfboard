@@ -43,6 +43,7 @@ class SelectablePlayerRead(BaseModel):
 class GameResultPlayerInput(BaseModel):
     """Draft input row for one player result entry."""
 
+    participant_id: int | None = None
     user_id: int | None = None
     seat_number: int | None = None
     role_name: str | None = None
@@ -73,6 +74,7 @@ class GameResultPlayerRead(BaseModel):
 
     id: int
     game_id: int
+    participant_id: int
     user_id: int | None
     username: str
     display_name: str

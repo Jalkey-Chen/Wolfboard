@@ -3,6 +3,7 @@ from app.models.event_day import EventDay
 from app.models.format_role import FormatRole
 from app.models.game import Game
 from app.models.game_status_history import GameStatusHistory
+from app.models.game_participant import GameParticipant
 from app.models.game_player import GamePlayer
 from app.models.game_format import GameFormat
 from app.models.registration import Registration
@@ -20,6 +21,7 @@ __all__ = [
     "FormatRole",
     "Game",
     "GameStatusHistory",
+    "GameParticipant",
     "GamePlayer",
     "GameFormat",
     "Registration",

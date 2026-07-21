@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.audit_log import AuditLog
 from app.models.event_day import EventDay
 from app.models.game import Game
+from app.models.game_participant import GameParticipant
 from app.models.game_player import GamePlayer
 from app.models.score_adjustment import ScoreAdjustment
 from app.models.score_log import ScoreLog
@@ -20,7 +21,7 @@ AUDIT_GAME_LOAD_OPTIONS = (
     selectinload(Game.event_day).selectinload(EventDay.season),
     selectinload(Game.format),
     selectinload(Game.judge).selectinload(User.user_roles),
-    selectinload(Game.players).selectinload(GamePlayer.user),
+    selectinload(Game.players).selectinload(GamePlayer.participant).selectinload(GameParticipant.user),
     selectinload(Game.players).selectinload(GamePlayer.adjustments),
     selectinload(Game.score_logs),
 )
@@ -63,6 +64,7 @@ def build_game_snapshot(game: Game) -> dict[str, Any]:
             _to_jsonable(
                 {
                     "id": player.id,
+                    "participant_id": player.participant_id,
                     "user_id": player.user_id,
                     "username": player.username,
                     "display_name": player.display_name,

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.enums import GameStatus, ResultConfirmationStatus
 from app.models.event_day import EventDay
 from app.models.game import Game
+from app.models.game_participant import GameParticipant
 from app.models.game_status_history import GameStatusHistory
 from app.models.game_player import GamePlayer
 from app.models.game_format import GameFormat
@@ -19,7 +20,7 @@ from app.models.user import User
 from app.models.user_role import UserRole
 from app.schemas.game_review import GameReviewSummary, GameRevisionWrite
 from app.services.audit import build_game_snapshot, reload_game_for_audit, write_audit_log
-from app.services.game_result import replace_game_result_rows
+from app.services.game_result import reconcile_game_result_rows
 from app.services.result_validation import validate_game_result_payload
 from app.services.score_log import create_effective_score_logs_for_game, void_score_logs_for_game
 
@@ -29,7 +30,9 @@ GAME_REVIEW_LOAD_OPTIONS = (
     selectinload(Game.event_day).selectinload(EventDay.registrations).selectinload(Registration.user),
     selectinload(Game.format).selectinload(GameFormat.format_roles),
     selectinload(Game.judge).selectinload(User.user_roles).selectinload(UserRole.role),
-    selectinload(Game.players).selectinload(GamePlayer.user),
+    selectinload(Game.participants).selectinload(GameParticipant.user),
+    selectinload(Game.participants).selectinload(GameParticipant.result).selectinload(GamePlayer.adjustments),
+    selectinload(Game.players).selectinload(GamePlayer.participant).selectinload(GameParticipant.user),
     selectinload(Game.players).selectinload(GamePlayer.adjustments),
     selectinload(Game.score_logs),
 )
@@ -269,9 +272,9 @@ def revise_game_result(db: Session, game: Game, payload: GameRevisionWrite, curr
             note="Voided because the game result was revised.",
         )
 
-    replace_game_result_rows(db, game, payload, current_user)
+    reconcile_game_result_rows(db, game, payload, current_user)
     db.flush()
-    db.expire(game, ["players"])
+    game = get_review_game_or_404(db, game.id)
 
     game.status = GameStatus.REVISED
     game.confirmed_at = datetime.now(timezone.utc)
