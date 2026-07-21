@@ -352,12 +352,60 @@ uv run alembic revision --autogenerate -m "describe your change"
 
 ## 测试
 
-后端测试：
+前端使用已提交的 `package-lock.json` 安装依赖，并执行与 CI 相同的质量检查：
+
+```bash
+cd frontend
+npm ci
+npm run lint
+npx tsc --noEmit
+npm run build
+```
+
+后端使用 `uv.lock` 的锁定依赖：
 
 ```bash
 cd backend
-uv run pytest
+uv sync --frozen --dev
+uv run pytest -q
+uv run alembic heads
 ```
+
+`pytest` 同时运行纯单元测试和真实 PostgreSQL 集成测试。集成测试不使用 SQLite，也不运行 seed：
+
+- 未设置 `TEST_DATABASE_ADMIN_URL` 时，测试夹具会通过 `docker-compose.test.yml` 启动本地 PostgreSQL。
+- 每次 pytest session 创建随机命名的 `wolfboard_test_*` 数据库，自动执行 `alembic upgrade head`。
+- 每个测试前会清空应用表，保留 Alembic revision；测试结束或失败后会删除随机数据库和由夹具启动的容器。
+- CI 可以通过 `TEST_DATABASE_ADMIN_URL` 指向 CI 专用 PostgreSQL service；不应指向开发或生产数据库。
+
+也可手动预启动本地测试 PostgreSQL：
+
+```bash
+docker compose --project-name wolfboard-tests -f docker-compose.test.yml up --detach --wait
+cd backend
+uv run pytest -q
+```
+
+若未设置外部测试 URL，pytest 会在本次运行后回收该 Compose 服务。
+
+### CI 质量门
+
+`.github/workflows/quality.yml` 在 push 和 pull request 上并行运行：
+
+- Frontend：`npm ci`、ESLint、TypeScript 检查、production build。
+- Backend：`uv sync --frozen --dev`、CI PostgreSQL service、`alembic upgrade head`、`pytest -q`。
+- CI 不运行 seed，也不需要真实 secrets。
+
+### 已知严格 xfail
+
+以下 M6 前置缺陷已由 `xfail(strict=True)` 记录，不会被普通 skip 隐藏：
+
+- `M6.0B`：保存草稿的 PUT 响应在新请求前可能保留过期的玩家关系缓存。
+- `M6.0B`：驳回前清空了 `submitted_by/submitted_at`，导致 `ResultConfirmation` 丢失原提交信息。
+- `M6.0B`：通用 `PATCH /games/{id}` 可绕过赛果状态转换服务。
+- `M6.0B`：重复保存草稿会删除并重建 `GamePlayer`，使 ID 变化。
+- `M6.0C`：非正式局的有效 `ScoreLog` 会参与赛季 `balance_after` 重算。
+- `M6.0C`：修订移除玩家时，替换行与该玩家后续流水的余额重算仍需统一修正。
 
 ## 当前未实现内容
 
