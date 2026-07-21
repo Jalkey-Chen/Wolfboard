@@ -14,26 +14,25 @@ import { useI18n } from "@/components/language-provider";
 import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { formatDate } from "@/lib/date";
-import { getJudgeOwnedGames, type GameSummary, type GameStatus } from "@/lib/api";
+import {
+  getJudgeOwnedGames,
+  type GamePlayStatus,
+  type GameResultStatus,
+  type GameSummary,
+} from "@/lib/api";
 import { useAuthenticatedSession } from "@/lib/use-authenticated-session";
 
 
-const statusOptions: Array<GameStatus | "all"> = [
-  "all",
-  "draft",
-  "in_progress",
-  "submitted",
-  "confirmed",
-  "revised",
-  "cancelled",
-];
+const playStatusOptions: Array<GamePlayStatus | "all"> = ["all", "scheduled", "in_progress", "ended", "cancelled"];
+const resultStatusOptions: Array<GameResultStatus | "all"> = ["all", "empty", "draft", "submitted", "rejected", "confirmed", "revised"];
 
 
 export default function JudgeGamesPage() {
   const { t, enumLabel } = useI18n();
   const { token, profile, isLoading } = useAuthenticatedSession({ requiredRoles: ["judge", "admin"] });
   const [games, setGames] = useState<GameSummary[]>([]);
-  const [statusFilter, setStatusFilter] = useState<GameStatus | "all">("all");
+  const [playStatusFilter, setPlayStatusFilter] = useState<GamePlayStatus | "all">("all");
+  const [resultStatusFilter, setResultStatusFilter] = useState<GameResultStatus | "all">("all");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const canUseJudgeQueue = profile?.roles.includes("judge") ?? false;
 
@@ -42,12 +41,15 @@ export default function JudgeGamesPage() {
       return;
     }
 
-    void getJudgeOwnedGames(token, statusFilter === "all" ? undefined : statusFilter)
+    void getJudgeOwnedGames(token, {
+      playStatus: playStatusFilter === "all" ? undefined : playStatusFilter,
+      resultStatus: resultStatusFilter === "all" ? undefined : resultStatusFilter,
+    })
       .then((response) => setGames(response))
       .catch((error) => {
         setErrorMessage(error instanceof Error ? error.message : t("judgeGames.loadError"));
       });
-  }, [canUseJudgeQueue, profile, statusFilter, t, token]);
+  }, [canUseJudgeQueue, playStatusFilter, profile, resultStatusFilter, t, token]);
 
   if (isLoading) {
     return <PageLoading message={t("judgeGames.loading")} />;
@@ -75,17 +77,32 @@ export default function JudgeGamesPage() {
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-2xl font-bold text-ink">{t("judgeGames.assignedGames")}</h2>
-                <select
-                  className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
-                  onChange={(event) => setStatusFilter(event.target.value as GameStatus | "all")}
-                  value={statusFilter}
-                >
-                  {statusOptions.map((status) => (
-                    <option key={status} value={status}>
-                      {status === "all" ? t("common.none") : enumLabel("gameStatus", status)}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex flex-wrap gap-3">
+                  <select
+                    aria-label={t("common.playStatus")}
+                    className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
+                    onChange={(event) => setPlayStatusFilter(event.target.value as GamePlayStatus | "all")}
+                    value={playStatusFilter}
+                  >
+                    {playStatusOptions.map((status) => (
+                      <option key={status} value={status}>
+                        {status === "all" ? t("common.playStatus") : enumLabel("gamePlayStatus", status)}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label={t("common.resultStatus")}
+                    className="rounded-2xl border border-slate-200 px-4 py-3 text-sm"
+                    onChange={(event) => setResultStatusFilter(event.target.value as GameResultStatus | "all")}
+                    value={resultStatusFilter}
+                  >
+                    {resultStatusOptions.map((status) => (
+                      <option key={status} value={status}>
+                        {status === "all" ? t("common.resultStatus") : enumLabel("gameResultStatus", status)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </section>
 
@@ -94,9 +111,9 @@ export default function JudgeGamesPage() {
                 {games.map((game) => {
                   const resultHref = `/judge/games/${game.id}/result`;
                   const actionLabel =
-                    game.status === "draft" || game.status === "in_progress"
+                    game.play_status !== "cancelled" && ["empty", "draft", "rejected"].includes(game.result_status)
                       ? t("games.enterResult")
-                      : game.status === "submitted"
+                      : game.result_status === "submitted"
                         ? t("judgeGames.viewSubmittedResult")
                         : t("judgeGames.viewGame");
 
@@ -114,7 +131,7 @@ export default function JudgeGamesPage() {
                             {formatDate(game.event_day_date)} · {game.format_name}
                           </p>
                           <p className="mt-2 text-sm text-slate-600">
-                            {t("common.type")}: {enumLabel("gameType", game.game_type)} · {t("common.status")}: {enumLabel("gameStatus", game.status)}
+                            {t("common.type")}: {enumLabel("gameType", game.game_type)} · {t("common.playStatus")}: {enumLabel("gamePlayStatus", game.play_status)} · {t("common.resultStatus")}: {enumLabel("gameResultStatus", game.result_status)}
                           </p>
                         </div>
                         <div className="flex flex-wrap gap-3">

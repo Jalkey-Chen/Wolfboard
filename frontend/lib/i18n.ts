@@ -25,7 +25,8 @@ type EnumGroup =
   | "formatCategory"
   | "formatRoleFaction"
   | "gameType"
-  | "gameStatus"
+  | "gamePlayStatus"
+  | "gameResultStatus"
   | "gamePlayerFaction"
   | "gamePlayerFinalStatus"
   | "scoreAdjustmentType";
@@ -63,6 +64,10 @@ const translations: Record<Language, TranslationDictionary> = {
     "common.reason": "原因",
     "common.note": "备注",
     "common.status": "状态",
+    "common.playStatus": "对局状态",
+    "common.resultStatus": "赛果状态",
+    "common.start": "开始",
+    "common.end": "结束",
     "common.type": "类型",
     "common.player": "玩家",
     "common.role": "角色",
@@ -212,6 +217,7 @@ const translations: Record<Language, TranslationDictionary> = {
     "games.timingAndNotes": "时间与备注",
     "games.startedAt": "开始时间",
     "games.endedAt": "结束时间",
+    "games.cancelReasonPrompt": "请输入取消原因",
     "games.resultSummary": "赛果摘要",
     "games.noResultDraft": "该对局还没有保存任何赛果草稿。",
     "games.editableHint": "当前对局可由负责主持人继续编辑赛果，可保存草稿或正式提交。",
@@ -341,6 +347,10 @@ const translations: Record<Language, TranslationDictionary> = {
     "common.reason": "Reason",
     "common.note": "Note",
     "common.status": "Status",
+    "common.playStatus": "Play Status",
+    "common.resultStatus": "Result Status",
+    "common.start": "Start",
+    "common.end": "End",
     "common.type": "Type",
     "common.player": "Player",
     "common.role": "Role",
@@ -490,6 +500,7 @@ const translations: Record<Language, TranslationDictionary> = {
     "games.timingAndNotes": "Timing and Notes",
     "games.startedAt": "Started At",
     "games.endedAt": "Ended At",
+    "games.cancelReasonPrompt": "Enter a cancellation reason",
     "games.resultSummary": "Result Summary",
     "games.noResultDraft": "No result draft has been saved for this game yet.",
     "games.editableHint": "This game is editable by the assigned judge. Use the result page to save a draft or submit the result.",
@@ -645,13 +656,19 @@ const enumTranslations: Record<EnumGroup, Record<string, Record<Language, string
     fun: { zh: "娱乐", en: "Fun" },
     practice: { zh: "练习", en: "Practice" },
   },
-  gameStatus: {
+  gamePlayStatus: {
+    scheduled: { zh: "待开始", en: "Scheduled" },
+    in_progress: { zh: "进行中", en: "In Progress" },
+    ended: { zh: "已结束", en: "Ended" },
+    cancelled: { zh: "已取消", en: "Cancelled" },
+  },
+  gameResultStatus: {
+    empty: { zh: "未录入", en: "Empty" },
     draft: { zh: "草稿", en: "Draft" },
-    in_progress: { zh: "录入中", en: "In Progress" },
     submitted: { zh: "已提交", en: "Submitted" },
+    rejected: { zh: "已驳回", en: "Rejected" },
     confirmed: { zh: "已确认", en: "Confirmed" },
     revised: { zh: "已修订", en: "Revised" },
-    cancelled: { zh: "已取消", en: "Cancelled" },
   },
   gamePlayerFaction: {
     good: { zh: "好人", en: "Good" },

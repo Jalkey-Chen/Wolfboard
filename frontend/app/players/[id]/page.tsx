@@ -104,7 +104,7 @@ export default function PlayerProfilePage() {
                           {entry.table_number}桌 / 第{entry.game_number}局
                         </td>
                         <td className="px-3 py-4 text-slate-700">{enumLabel("gameType", entry.game_type)}</td>
-                        <td className="px-3 py-4 text-slate-700">{enumLabel("gameStatus", entry.game_status)}</td>
+                        <td className="px-3 py-4 text-slate-700">{enumLabel("gamePlayStatus", entry.play_status)} · {enumLabel("gameResultStatus", entry.result_status)}</td>
                         <td className="px-3 py-4 text-slate-700">{entry.delta}</td>
                         <td className="px-3 py-4 text-slate-700">{entry.balance_after}</td>
                         <td className="px-3 py-4 text-slate-700">{formatDateTime(entry.created_at)}</td>

@@ -264,7 +264,7 @@ export function DashboardShell() {
                   </div>
                   <div className="mt-1 text-sm text-slate-600">{game.format_name}</div>
                   <div className={`mt-2 ${metaLabelClass}`}>
-                    {enumLabel("gameType", game.game_type)} · {enumLabel("gameStatus", game.status)}
+                    {enumLabel("gameType", game.game_type)} · {enumLabel("gamePlayStatus", game.play_status)} · {enumLabel("gameResultStatus", game.result_status)}
                   </div>
                 </Link>
               ))}

@@ -16,7 +16,15 @@ import { PageError, PageLoading } from "@/components/page-state";
 import { SiteShell } from "@/components/site-shell";
 import { formatDate, formatDateTime } from "@/lib/date";
 import { getMetaLabelClass } from "@/lib/i18n";
-import { getGame, getGameResultDraft, type GameDetail, type GameResultDraftResponse } from "@/lib/api";
+import {
+  cancelGame,
+  endGame,
+  getGame,
+  getGameResultDraft,
+  startGame,
+  type GameDetail,
+  type GameResultDraftResponse,
+} from "@/lib/api";
 import { useAuthenticatedSession } from "@/lib/use-authenticated-session";
 
 
@@ -28,6 +36,7 @@ export default function GameDetailPage() {
   const [game, setGame] = useState<GameDetail | null>(null);
   const [resultDraft, setResultDraft] = useState<GameResultDraftResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isChangingState, setIsChangingState] = useState(false);
 
   const userIsAdmin = profile?.roles.includes("admin") ?? false;
   const userIsJudge = profile?.roles.includes("judge") ?? false;
@@ -52,8 +61,8 @@ export default function GameDetailPage() {
     const canOpenResultPage =
       userIsAdmin ||
       (userIsJudge && profile.user.id === game.judge_user_id) ||
-      game.status === "confirmed" ||
-      game.status === "revised";
+      game.result_status === "confirmed" ||
+      game.result_status === "revised";
     if (!canOpenResultPage) {
       setResultDraft(null);
       return;
@@ -74,14 +83,39 @@ export default function GameDetailPage() {
     return null;
   }
 
+  async function changePlayState(action: "start" | "end" | "cancel") {
+    if (!token || !game) return;
+    let reason = "";
+    if (action === "cancel") {
+      reason = window.prompt(t("games.cancelReasonPrompt"))?.trim() ?? "";
+      if (!reason) return;
+    }
+    setIsChangingState(true);
+    setErrorMessage(null);
+    try {
+      const response = action === "start"
+        ? await startGame(token, game.id)
+        : action === "end"
+          ? await endGame(token, game.id)
+          : await cancelGame(token, game.id, reason);
+      setGame(response);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : t("common.failedToLoad"));
+    } finally {
+      setIsChangingState(false);
+    }
+  }
+
   const canOpenResultPage =
     game !== null && (userIsAdmin || (userIsJudge && profile.user.id === game.judge_user_id));
   const canEditResult =
     game !== null &&
     userIsJudge &&
     profile.user.id === game.judge_user_id &&
-    (game.status === "draft" || game.status === "in_progress");
-  const canReviewResult = game !== null && userIsAdmin && game.status === "submitted";
+    game.play_status !== "cancelled" &&
+    ["empty", "draft", "rejected"].includes(game.result_status);
+  const canReviewResult = game !== null && userIsAdmin && game.result_status === "submitted";
+  const canOperatePlay = game !== null && (userIsAdmin || (userIsJudge && profile.user.id === game.judge_user_id));
   const metaLabelClass = getMetaLabelClass(language);
 
   return (
@@ -92,6 +126,21 @@ export default function GameDetailPage() {
       actions={
         game ? (
           <div className="flex flex-wrap gap-3">
+            {canOperatePlay && game.play_status === "scheduled" ? (
+              <button disabled={isChangingState} onClick={() => void changePlayState("start")} type="button" className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                {t("common.start")}
+              </button>
+            ) : null}
+            {canOperatePlay && game.play_status === "in_progress" ? (
+              <button disabled={isChangingState} onClick={() => void changePlayState("end")} type="button" className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                {t("common.end")}
+              </button>
+            ) : null}
+            {userIsAdmin && !["cancelled"].includes(game.play_status) && !["submitted", "confirmed", "revised"].includes(game.result_status) ? (
+              <button disabled={isChangingState} onClick={() => void changePlayState("cancel")} type="button" className="rounded-full bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 disabled:opacity-50">
+                {t("common.cancel")}
+              </button>
+            ) : null}
             {canOpenResultPage ? (
               <Link
                 className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
@@ -160,8 +209,9 @@ export default function GameDetailPage() {
                   <div className="mt-2 text-sm text-slate-700">{enumLabel("gameType", game.game_type)}</div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className={metaLabelClass}>{t("common.status")}</div>
-                  <div className="mt-2 text-sm text-slate-700">{enumLabel("gameStatus", game.status)}</div>
+                  <div className={metaLabelClass}>{t("common.playStatus")}</div>
+                  <div className="mt-2 text-sm text-slate-700">{enumLabel("gamePlayStatus", game.play_status)}</div>
+                  <div className="mt-1 text-xs text-slate-500">{t("common.resultStatus")}: {enumLabel("gameResultStatus", game.result_status)}</div>
                 </div>
               </div>
             </section>
@@ -185,11 +235,16 @@ export default function GameDetailPage() {
               <div className="mt-5 rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-700">
                 {game.notes ?? t("common.noNotes")}
               </div>
+              {game.play_status === "cancelled" ? (
+                <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-800">
+                  {game.cancellation_reason ?? t("common.notSet")} · {formatDateTime(game.cancelled_at)}
+                </div>
+              ) : null}
 
               <div className="mt-5 rounded-2xl border border-dashed border-slate-300 px-4 py-4 text-sm text-slate-600">
                 {canEditResult
                   ? t("games.editableHint")
-                  : game.status === "submitted"
+                  : game.result_status === "submitted"
                     ? t("games.submittedHint")
                     : t("games.noActionHint")}
               </div>
