@@ -423,7 +423,7 @@ def test_revision_recalculates_later_balances_for_removed_player(
 
 @pytest.mark.xfail(
     strict=True,
-    reason="M6.0B: full-replacement draft saves delete and recreate GamePlayer rows.",
+    reason="M6.0C: stable participant identity awaits the dedicated participant model decision.",
 )
 def test_repeated_draft_save_preserves_game_player_ids(
     api_client: TestClient,

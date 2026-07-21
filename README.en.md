@@ -258,6 +258,20 @@ That means:
 - revisions void old ledger rows
 - new effective ledger rows are rebuilt after revision
 
+### Game state and concurrent review
+
+- New games are always created as `draft`. Generic `PATCH /games/{id}` edits only scheduling and operational fields and no longer accepts `status`.
+- `in_progress`, `submitted`, `confirmed`, `revised`, and rejection back to `draft` can only be produced by their result workflow endpoints. Cancellation has no dedicated endpoint yet and cannot use generic PATCH as a bypass.
+- Confirm, reject, and revise use PostgreSQL `SELECT ... FOR UPDATE` within the same database transaction. If the review state changes while an action waits for the row lock, the API returns `409 Conflict`.
+- Confirm, reject, and revise write `GameStatusHistory` and `AuditLog`. To keep M6.0B scoped, the first draft save and submit retain their existing behavior and do not yet write those histories.
+
+### ScoreLog ledger semantics
+
+- Confirmed or revised official, fun, and practice games may all retain a `ScoreLog.delta`.
+- `effective_status=effective` identifies the current ledger version. PostgreSQL enforces at most one effective row per `game_id + user_id + source_type` with a partial unique index.
+- `balance_after` is the player's formal standing balance at that point and matches leaderboard semantics. Only official games change it; fun and practice rows retain their delta without increasing or decreasing the formal balance.
+- Revision marks old effective rows `voided`, writes effective rows for the new result, and recalculates later season balances for the union of old and new players.
+
 ## Useful Local Verification Flows
 
 ### Sign-in check
@@ -402,14 +416,7 @@ When no external test URL is set, pytest owns and removes that Compose service a
 
 ### Known strict xfails
 
-The following M6 prerequisite defects are executable `xfail(strict=True)` specifications, never ordinary skips:
-
-- `M6.0B`: the draft-save PUT response can retain a stale player relationship cache until a new request.
-- `M6.0B`: rejection clears `submitted_by/submitted_at` before `ResultConfirmation` captures the original submission.
-- `M6.0B`: generic `PATCH /games/{id}` can bypass the result transition services.
-- `M6.0B`: repeated draft saves delete and recreate `GamePlayer` rows, changing their IDs.
-- `M6.0C`: effective score logs from non-official games participate in season `balance_after` recalculation.
-- `M6.0C`: revision replacement rows and later balance recalculation for a removed player still need a unified correction.
+Only one `xfail(strict=True)` remains: repeated draft saves delete and recreate `GamePlayer` rows, changing their IDs. M6.0B deliberately does not patch this with a local upsert; M6.0C will make the dedicated decision about a stable in-game participant model.
 
 ## Not Implemented Yet
 

@@ -254,6 +254,20 @@ password123
 - 修订时旧流水会 `voided`
 - 新流水会重新写入
 
+### 对局状态与审核并发
+
+- 新对局固定以 `draft` 创建；通用 `PATCH /games/{id}` 只编辑桌号、局号、版型、主持人、对局类型、时间和备注，不接受 `status`。
+- `in_progress`、`submitted`、`confirmed`、`revised` 和 reject 回到 `draft` 只能由对应的赛果业务 endpoint 产生。取消对局暂无专用 endpoint，不能通过通用 PATCH 绕过。
+- confirm、reject 和 revise 在同一个数据库 transaction 中使用 PostgreSQL `SELECT ... FOR UPDATE`。等待行锁期间如审核状态已改变，API 返回 `409 Conflict`。
+- confirm、reject 和 revise 会写入 `GameStatusHistory` 和 `AuditLog`。为保持本次改动范围，草稿首次保存与 submit 仍保留现有行为，暂不写这两类历史。
+
+### ScoreLog 账本语义
+
+- 已确认或修订的 official、fun 和 practice 对局都可以保留 `ScoreLog.delta`。
+- `effective_status=effective` 表示当前有效的流水版本；同一 `game_id + user_id + source_type` 最多只有一条 effective 流水，由 PostgreSQL partial unique index 保护。
+- `balance_after` 表示该玩家当时的正式积分余额，与排行榜口径一致。只有 official 对局改变余额；fun 和 practice 流水保留 delta，但不增减正式余额。
+- 修订会将该局旧 effective 流水改为 `voided`，为新赛果写入 effective 流水，并对旧新玩家并集重算该赛季后续余额。
+
 ## 常用本地验证流程
 
 ### 1. 登录验证
@@ -398,14 +412,7 @@ uv run pytest -q
 
 ### 已知严格 xfail
 
-以下 M6 前置缺陷已由 `xfail(strict=True)` 记录，不会被普通 skip 隐藏：
-
-- `M6.0B`：保存草稿的 PUT 响应在新请求前可能保留过期的玩家关系缓存。
-- `M6.0B`：驳回前清空了 `submitted_by/submitted_at`，导致 `ResultConfirmation` 丢失原提交信息。
-- `M6.0B`：通用 `PATCH /games/{id}` 可绕过赛果状态转换服务。
-- `M6.0B`：重复保存草稿会删除并重建 `GamePlayer`，使 ID 变化。
-- `M6.0C`：非正式局的有效 `ScoreLog` 会参与赛季 `balance_after` 重算。
-- `M6.0C`：修订移除玩家时，替换行与该玩家后续流水的余额重算仍需统一修正。
+当前仅保留一条 `xfail(strict=True)`：重复保存草稿会删除并重建 `GamePlayer`，使 ID 变化。该问题不在 M6.0B 中通过局部 upsert 修补；M6.0C 将专门决定稳定的局内参与者模型。
 
 ## 当前未实现内容
 
