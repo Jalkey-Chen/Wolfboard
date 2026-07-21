@@ -268,6 +268,15 @@ password123
 - `balance_after` 表示该玩家当时的正式积分余额，与排行榜口径一致。只有 official 对局改变余额；fun 和 practice 流水保留 delta，但不增减正式余额。
 - 修订会将该局旧 effective 流水改为 `voided`，为新赛果写入 effective 流水，并对旧新玩家并集重算该赛季后续余额。
 
+### 稳定局内参与者
+
+- `GameParticipant` 是一局内的稳定身份，保存可变的 `user_id`、座位号和比赛时显示名称快照；未来事件 actor/target 将以它作为引用对象。
+- `GamePlayer` 只保存角色、阵营、最终状态、胜负、积分、备注和调整项，不再重复保存 user 或 seat。
+- 赛果 API 仍扁平返回 `user_id` 与 `seat_number`，并新增 `participant_id`。后续 PUT/revise 应原样回传该 ID。
+- 草稿保存采用 participant reconcile：保留行原地更新，新增行创建，移除行单独删除；完全相同的重复保存会保持 participant 与 result ID 不变。
+- 显示名称在绑定用户时写入 snapshot，用户之后改名不会重写历史显示名。当前尚无游客创建 UI，也尚未冻结角色或版型定义。
+- 架构边界详见 `docs/architecture/game-participants.md`；M6.0D 将处理进行/审核状态拆分与历史版型快照。
+
 ## 常用本地验证流程
 
 ### 1. 登录验证
@@ -410,9 +419,9 @@ uv run pytest -q
 - Backend：`uv sync --frozen --dev`、CI PostgreSQL service、`alembic upgrade head`、`pytest -q`。
 - CI 不运行 seed，也不需要真实 secrets。
 
-### 已知严格 xfail
+### 已知缺陷基线
 
-当前仅保留一条 `xfail(strict=True)`：重复保存草稿会删除并重建 `GamePlayer`，使 ID 变化。该问题不在 M6.0B 中通过局部 upsert 修补；M6.0C 将专门决定稳定的局内参与者模型。
+M6.0C 已将最后一条 strict xfail（重复保存草稿导致 `GamePlayer.id` 变化）转为普通通过测试。当前测试套件为 `0 xfailed`。
 
 ## 当前未实现内容
 

@@ -272,6 +272,15 @@ That means:
 - `balance_after` is the player's formal standing balance at that point and matches leaderboard semantics. Only official games change it; fun and practice rows retain their delta without increasing or decreasing the formal balance.
 - Revision marks old effective rows `voided`, writes effective rows for the new result, and recalculates later season balances for the union of old and new players.
 
+### Stable in-game participants
+
+- `GameParticipant` is the stable identity inside one game. It owns the mutable `user_id`, seat, and game-time display-name snapshot and is the intended future event actor/target reference.
+- `GamePlayer` now owns only role, faction, final state, outcome, score, notes, and adjustments. It no longer duplicates user or seat columns.
+- Result APIs still flatten `user_id` and `seat_number` for compatibility and now include `participant_id`; later PUT and revise requests should return that ID unchanged.
+- Draft writes reconcile by participant: retained rows update in place, additions create rows, and removals delete only their own aggregate. Identical repeated saves preserve participant and result IDs.
+- Display names are snapshotted when an account is bound and do not follow later account renames. Guest creation UI and frozen role/format definitions remain deferred.
+- See `docs/architecture/game-participants.md` for the boundary. M6.0D is expected to address play/review status separation and historical format snapshots.
+
 ## Useful Local Verification Flows
 
 ### Sign-in check
@@ -414,9 +423,9 @@ When no external test URL is set, pytest owns and removes that Compose service a
 - Backend: `uv sync --frozen --dev`, a CI-only PostgreSQL service, `alembic upgrade head`, and `pytest -q`.
 - CI does not run the seed script and does not require real secrets.
 
-### Known strict xfails
+### Known-defect baseline
 
-Only one `xfail(strict=True)` remains: repeated draft saves delete and recreate `GamePlayer` rows, changing their IDs. M6.0B deliberately does not patch this with a local upsert; M6.0C will make the dedicated decision about a stable in-game participant model.
+M6.0C converts the final strict xfail (a repeated draft save changing `GamePlayer.id`) into a normal passing regression test. The suite now has `0 xfailed` tests.
 
 ## Not Implemented Yet
 
