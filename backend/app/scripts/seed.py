@@ -14,10 +14,13 @@ from app.core.enums import (
     EventDayStatus,
     FormatCategory,
     FormatRoleFaction,
+    GamePlayerFaction,
+    GamePlayerFinalStatus,
     GameStatus,
     GameType,
     RegistrationStatus,
     RegistrationType,
+    ScoreAdjustmentType,
     SeasonStatus,
 )
 from app.core.security import get_password_hash
@@ -26,9 +29,12 @@ from app.models.event_day import EventDay
 from app.models.format_role import FormatRole
 from app.models.game import Game
 from app.models.game_format import GameFormat
+from app.models.game_participant import GameParticipant
+from app.models.game_player import GamePlayer
 from app.models.registration import Registration
 from app.models.role import Role
 from app.models.season import Season
+from app.models.score_adjustment import ScoreAdjustment
 from app.models.user import User
 from app.models.user_role import UserRole
 
@@ -88,6 +94,7 @@ CLOSED_EVENT_DAY_TITLE = "2026-03-29 社群比赛日"
 LEGACY_OPEN_EVENT_DAY_TITLES = ("2026-04-05 Official Match Day",)
 LEGACY_CLOSED_EVENT_DAY_TITLES = ("2026-03-29 Community Match Day",)
 SEEDED_GAME_NOTE_PREFIX = "Milestone 3 示例对局"
+SEEDED_RESULT_ADJUSTMENT_REASON = "Milestone 6 stable-participant sample"
 
 PRESET_FORMATS = [
     {
@@ -737,6 +744,82 @@ def seed_games() -> None:
             else:
                 game.started_at = None
                 game.ended_at = None
+
+        db.flush()
+        sample_game = db.scalar(
+            select(Game).where(
+                Game.notes == f"{SEEDED_GAME_NOTE_PREFIX}：正式局第 3 轮。",
+            )
+        )
+        if sample_game is not None:
+            sample_rows = [
+                ("sample_player_01", 1, "预言家", GamePlayerFaction.GOOD, True),
+                ("sample_player_02", 2, "狼人", GamePlayerFaction.WOLF, False),
+            ]
+            for username, seat_number, role_name, faction, is_winner in sample_rows:
+                user = users_by_username[username]
+                participant = db.scalar(
+                    select(GameParticipant).where(
+                        GameParticipant.game_id == sample_game.id,
+                        GameParticipant.user_id == user.id,
+                    )
+                )
+                if participant is None:
+                    occupied_seat = db.scalar(
+                        select(GameParticipant).where(
+                            GameParticipant.game_id == sample_game.id,
+                            GameParticipant.seat_number == seat_number,
+                        )
+                    )
+                    if occupied_seat is not None:
+                        continue
+                    participant = GameParticipant(
+                        game_id=sample_game.id,
+                        user_id=user.id,
+                        seat_number=seat_number,
+                        display_name_snapshot=user.display_name,
+                    )
+                    db.add(participant)
+                    db.flush()
+
+                game_player = db.scalar(
+                    select(GamePlayer).where(GamePlayer.participant_id == participant.id)
+                )
+                if game_player is None:
+                    game_player = GamePlayer(
+                        game_id=sample_game.id,
+                        participant_id=participant.id,
+                        role_name=role_name,
+                        faction=faction,
+                        final_status=GamePlayerFinalStatus.ALIVE,
+                        is_winner=is_winner,
+                        base_score=1.0 if is_winner else 0.0,
+                        adjustment_score=0.0,
+                        final_score=1.0 if is_winner else 0.0,
+                        remarks="Stable participant seed sample",
+                    )
+                    db.add(game_player)
+                    db.flush()
+
+                if seat_number == 1:
+                    adjustment = db.scalar(
+                        select(ScoreAdjustment).where(
+                            ScoreAdjustment.game_player_id == game_player.id,
+                            ScoreAdjustment.reason == SEEDED_RESULT_ADJUSTMENT_REASON,
+                        )
+                    )
+                    if adjustment is None:
+                        db.add(
+                            ScoreAdjustment(
+                                game_player_id=game_player.id,
+                                adjustment_type=ScoreAdjustmentType.JUDGE_BONUS,
+                                delta=0.25,
+                                reason=SEEDED_RESULT_ADJUSTMENT_REASON,
+                                created_by=sample_game.judge_user_id,
+                            )
+                        )
+                        game_player.adjustment_score = 0.25
+                        game_player.final_score = game_player.base_score + 0.25
 
         db.commit()
 
