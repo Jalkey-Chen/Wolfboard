@@ -23,7 +23,12 @@ from app.services.game_review import (
     reject_game_result,
     revise_game_result,
 )
-from tests.integration.result_support import create_result_scenario, save_and_submit
+from tests.integration.result_support import (
+    API_PREFIX,
+    confirm,
+    create_result_scenario,
+    save_and_submit,
+)
 
 
 pytestmark = pytest.mark.integration
@@ -116,6 +121,79 @@ def test_concurrent_review_actions_allow_only_one_submitted_version_winner(
     assert db_session.scalar(
         select(func.count(AuditLog.id)).where(AuditLog.entity_id == scenario.game_id)
     ) == 1
+    effective_logs = list(
+        db_session.scalars(
+            select(ScoreLog).where(
+                ScoreLog.game_id == scenario.game_id,
+                ScoreLog.effective_status == ScoreLogEffectiveStatus.EFFECTIVE,
+            )
+        )
+    )
+    assert len(effective_logs) == 2
+    assert len({log.user_id for log in effective_logs}) == 2
+
+
+def test_concurrent_revisions_of_the_same_revised_version_allow_one_winner(
+    api_client: TestClient,
+    db_session: Session,
+    test_session_factory: sessionmaker[Session],
+) -> None:
+    scenario = create_result_scenario(db_session)
+    save_and_submit(api_client, scenario, scenario.game_id)
+    confirm(api_client, scenario, scenario.game_id)
+    first_revision = api_client.post(
+        f"{API_PREFIX}/games/{scenario.game_id}/revise-result",
+        json={**scenario.valid_draft(), "reason": "Establish revised state"},
+        headers=scenario.headers_for(scenario.admin_id),
+    )
+    assert first_revision.status_code == 200
+
+    with test_session_factory() as winning_session:
+        winning_game = get_review_game_or_404(winning_session, scenario.game_id)
+        winning_admin = winning_session.get(User, scenario.admin_id)
+        assert winning_admin is not None
+        winning_session.execute(
+            select(Game).where(Game.id == scenario.game_id).with_for_update()
+        ).scalar_one()
+
+        loaded = Event()
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(
+                _run_losing_action,
+                test_session_factory,
+                game_id=scenario.game_id,
+                admin_id=scenario.admin_id,
+                action="revise",
+                revision_payload=scenario.valid_draft(),
+                loaded=loaded,
+            )
+            assert loaded.wait(timeout=5)
+            assert not future.done()
+
+            revise_game_result(
+                winning_session,
+                winning_game,
+                GameRevisionWrite.model_validate(
+                    {**scenario.valid_draft(), "reason": "Winning revised-state correction"}
+                ),
+                winning_admin,
+            )
+            assert future.result(timeout=5) == 409
+
+    db_session.expire_all()
+    assert db_session.scalar(
+        select(func.count(ResultConfirmation.id)).where(
+            ResultConfirmation.game_id == scenario.game_id
+        )
+    ) == 3
+    assert db_session.scalar(
+        select(func.count(GameStatusHistory.id)).where(
+            GameStatusHistory.game_id == scenario.game_id
+        )
+    ) == 3
+    assert db_session.scalar(
+        select(func.count(AuditLog.id)).where(AuditLog.entity_id == scenario.game_id)
+    ) == 3
     effective_logs = list(
         db_session.scalars(
             select(ScoreLog).where(

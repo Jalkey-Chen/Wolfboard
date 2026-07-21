@@ -66,6 +66,7 @@ def _lock_current_review_version(db: Session, game: Game) -> Game:
     """Lock and reload a game, rejecting work based on a stale review state."""
 
     expected_status = game.status
+    expected_updated_at = game.updated_at
     statement = (
         select(Game)
         .options(*GAME_REVIEW_LOAD_OPTIONS)
@@ -76,7 +77,10 @@ def _lock_current_review_version(db: Session, game: Game) -> Game:
     locked_game = db.scalar(statement)
     if locked_game is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Game not found.")
-    if locked_game.status != expected_status:
+    if (
+        locked_game.status != expected_status
+        or locked_game.updated_at != expected_updated_at
+    ):
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
