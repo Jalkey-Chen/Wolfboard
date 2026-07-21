@@ -11,6 +11,7 @@ from app.core.enums import GameStatus, GameType, ScoreLogEffectiveStatus
 from app.models.game import Game
 from app.models.game_player import GamePlayer
 from app.models.event_day import EventDay
+from app.models.audit_log import AuditLog
 from app.models.result_confirmation import ResultConfirmation
 from app.models.score_log import ScoreLog
 from app.models.season import Season
@@ -395,6 +396,29 @@ def test_revision_recalculates_later_balances_for_removed_player(
     assert entries[scenario.player_one_id]["total_score"] == later_log.balance_after
     assert entries[scenario.player_two_id]["total_score"] == retained_later_log.balance_after
     assert entries[scenario.replacement_player_id]["total_score"] == -1.0
+
+    audit = db_session.scalar(
+        select(AuditLog).where(
+            AuditLog.entity_id == scenario.game_id,
+            AuditLog.action_type == "revise",
+        )
+    )
+    assert audit is not None
+    assert {player["user_id"] for player in audit.old_value_json["players"]} == {
+        scenario.player_one_id,
+        scenario.player_two_id,
+    }
+    assert {player["user_id"] for player in audit.new_value_json["players"]} == {
+        scenario.player_two_id,
+        scenario.replacement_player_id,
+    }
+    assert len(
+        [
+            score_log
+            for score_log in audit.new_value_json["score_logs"]
+            if score_log["effective_status"] == ScoreLogEffectiveStatus.EFFECTIVE.value
+        ]
+    ) == 2
 
 
 @pytest.mark.xfail(

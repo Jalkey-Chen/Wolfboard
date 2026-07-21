@@ -50,11 +50,39 @@ def list_submitted_games_for_review(db: Session) -> list[GameReviewSummary]:
 def get_review_game_or_404(db: Session, game_id: int) -> Game:
     """Load a game with review-related relationships or raise 404."""
 
-    statement = select(Game).options(*GAME_REVIEW_LOAD_OPTIONS).where(Game.id == game_id)
+    statement = (
+        select(Game)
+        .options(*GAME_REVIEW_LOAD_OPTIONS)
+        .where(Game.id == game_id)
+        .execution_options(populate_existing=True)
+    )
     game = db.scalar(statement)
     if game is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Game not found.")
     return game
+
+
+def _lock_current_review_version(db: Session, game: Game) -> Game:
+    """Lock and reload a game, rejecting work based on a stale review state."""
+
+    expected_status = game.status
+    statement = (
+        select(Game)
+        .options(*GAME_REVIEW_LOAD_OPTIONS)
+        .where(Game.id == game.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    locked_game = db.scalar(statement)
+    if locked_game is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Game not found.")
+    if locked_game.status != expected_status:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The game result changed while this review action was waiting. Reload and try again.",
+        )
+    return locked_game
 
 
 def _write_status_history(
@@ -114,6 +142,7 @@ def _ensure_status(game: Game, allowed_statuses: set[GameStatus], message: str) 
 def confirm_game_result(db: Session, game: Game, current_user: User, *, comment: str | None) -> Game:
     """Confirm a submitted result, make it effective, and write score logs."""
 
+    game = _lock_current_review_version(db, game)
     _ensure_status(game, {GameStatus.SUBMITTED}, "Only submitted games can be confirmed.")
     old_snapshot = build_game_snapshot(game)
     previous_status = game.status
@@ -161,6 +190,7 @@ def confirm_game_result(db: Session, game: Game, current_user: User, *, comment:
 def reject_game_result(db: Session, game: Game, current_user: User, *, comment: str) -> Game:
     """Reject a submitted result and reopen the game for judge work."""
 
+    game = _lock_current_review_version(db, game)
     _ensure_status(game, {GameStatus.SUBMITTED}, "Only submitted games can be rejected.")
     old_snapshot = build_game_snapshot(game)
     previous_status = game.status
@@ -208,6 +238,7 @@ def reject_game_result(db: Session, game: Game, current_user: User, *, comment: 
 def revise_game_result(db: Session, game: Game, payload: GameRevisionWrite, current_user: User) -> Game:
     """Apply an admin revision and rebuild the formal score ledger if needed."""
 
+    game = _lock_current_review_version(db, game)
     _ensure_status(
         game,
         {GameStatus.SUBMITTED, GameStatus.CONFIRMED, GameStatus.REVISED},

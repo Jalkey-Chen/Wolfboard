@@ -43,7 +43,12 @@ def _to_jsonable(value: Any) -> Any:
 def reload_game_for_audit(db: Session, game_id: int) -> Game:
     """Reload a game with the relationships needed for audit snapshots."""
 
-    statement = select(Game).options(*AUDIT_GAME_LOAD_OPTIONS).where(Game.id == game_id)
+    statement = (
+        select(Game)
+        .options(*AUDIT_GAME_LOAD_OPTIONS)
+        .where(Game.id == game_id)
+        .execution_options(populate_existing=True)
+    )
     return db.scalar(statement)
 
 
