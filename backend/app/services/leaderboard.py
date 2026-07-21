@@ -5,7 +5,6 @@ from collections import defaultdict
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
-from app.core.enums import GameStatus, GameType, ScoreLogEffectiveStatus
 from app.models.event_day import EventDay
 from app.models.game import Game
 from app.models.game_player import GamePlayer
@@ -13,6 +12,7 @@ from app.models.score_log import ScoreLog
 from app.models.season import Season
 from app.models.user import User
 from app.schemas.leaderboard import LeaderboardEntryRead
+from app.services.score_log import official_score_log_filters
 
 
 def get_season_leaderboard(db: Session, season_id: int) -> list[LeaderboardEntryRead]:
@@ -30,9 +30,7 @@ def get_season_leaderboard(db: Session, season_id: int) -> list[LeaderboardEntry
         )
         .where(
             EventDay.season_id == season_id,
-            Game.game_type == GameType.OFFICIAL,
-            Game.status.in_([GameStatus.CONFIRMED, GameStatus.REVISED]),
-            ScoreLog.effective_status == ScoreLogEffectiveStatus.EFFECTIVE,
+            *official_score_log_filters(),
         )
         .order_by(User.display_name.asc(), ScoreLog.created_at.asc(), ScoreLog.id.asc())
     )
@@ -72,4 +70,3 @@ def get_season_leaderboard(db: Session, season_id: int) -> list[LeaderboardEntry
         )
         for index, item in enumerate(ranked)
     ]
-

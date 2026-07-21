@@ -226,9 +226,17 @@ def revise_game_result(db: Session, game: Game, payload: GameRevisionWrite, curr
             },
         )
 
-    replace_game_result_rows(db, game, payload, current_user)
+    affected_user_ids: set[int] = set()
     if previous_status in {GameStatus.CONFIRMED, GameStatus.REVISED}:
-        void_score_logs_for_game(db, game.id, note="Voided because the game result was revised.")
+        affected_user_ids = void_score_logs_for_game(
+            db,
+            game.id,
+            note="Voided because the game result was revised.",
+        )
+
+    replace_game_result_rows(db, game, payload, current_user)
+    db.flush()
+    db.expire(game, ["players"])
 
     game.status = GameStatus.REVISED
     game.confirmed_at = datetime.now(timezone.utc)
@@ -251,7 +259,12 @@ def revise_game_result(db: Session, game: Game, payload: GameRevisionWrite, curr
         changed_by=current_user.id,
         reason=payload.reason,
     )
-    create_effective_score_logs_for_game(db, game, note=f"Revised by admin: {payload.reason}")
+    create_effective_score_logs_for_game(
+        db,
+        game,
+        note=f"Revised by admin: {payload.reason}",
+        additional_affected_user_ids=affected_user_ids,
+    )
     db.flush()
 
     refreshed_game = reload_game_for_audit(db, game.id)

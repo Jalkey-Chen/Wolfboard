@@ -1,6 +1,6 @@
 """Executable specifications for known M6 prerequisite defects."""
 
-from datetime import datetime
+from datetime import date, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,8 +10,10 @@ from sqlalchemy.orm import Session
 from app.core.enums import GameStatus, GameType, ScoreLogEffectiveStatus
 from app.models.game import Game
 from app.models.game_player import GamePlayer
+from app.models.event_day import EventDay
 from app.models.result_confirmation import ResultConfirmation
 from app.models.score_log import ScoreLog
+from app.models.season import Season
 from tests.integration.result_support import (
     API_PREFIX,
     confirm,
@@ -158,10 +160,6 @@ def test_game_creation_only_allows_draft_initial_status(
     assert created.json()["status"] == GameStatus.DRAFT.value
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="M6.0C: season balance recalculation includes non-official game score logs.",
-)
 def test_non_official_score_logs_do_not_affect_official_running_balance(
     api_client: TestClient,
     db_session: Session,
@@ -169,26 +167,113 @@ def test_non_official_score_logs_do_not_affect_official_running_balance(
     scenario = create_result_scenario(db_session, game_type=GameType.FUN)
     save_and_submit(api_client, scenario, scenario.game_id)
     confirm(api_client, scenario, scenario.game_id)
+    practice_game_id = create_additional_game(db_session, scenario, game_type=GameType.PRACTICE)
+    save_and_submit(api_client, scenario, practice_game_id)
+    confirm(api_client, scenario, practice_game_id)
     official_game_id = create_additional_game(db_session, scenario, game_type=GameType.OFFICIAL)
     save_and_submit(api_client, scenario, official_game_id)
     confirm(api_client, scenario, official_game_id)
+    later_fun_game_id = create_additional_game(db_session, scenario, game_type=GameType.FUN)
+    save_and_submit(api_client, scenario, later_fun_game_id)
+    confirm(api_client, scenario, later_fun_game_id)
 
     db_session.expire_all()
-    official_log = db_session.scalar(
+    player_logs = {
+        score_log.game_id: score_log
+        for score_log in db_session.scalars(
+            select(ScoreLog).where(
+                ScoreLog.user_id == scenario.player_one_id,
+                ScoreLog.effective_status == ScoreLogEffectiveStatus.EFFECTIVE,
+            )
+        )
+    }
+    assert player_logs[scenario.game_id].balance_after == 0.0
+    assert player_logs[practice_game_id].balance_after == 0.0
+    assert player_logs[official_game_id].balance_after == 1.25
+    assert player_logs[later_fun_game_id].balance_after == 1.25
+
+    revised_payload = scenario.valid_draft()
+    revised_players = revised_payload["players"]
+    assert isinstance(revised_players, list)
+    revised_players[0]["is_winner"] = False
+    response = api_client.post(
+        f"{API_PREFIX}/games/{official_game_id}/revise-result",
+        json={**revised_payload, "reason": "Correct official outcome"},
+        headers=scenario.headers_for(scenario.admin_id),
+    )
+    assert response.status_code == 200
+
+    db_session.expire_all()
+    revised_official_log = db_session.scalar(
         select(ScoreLog).where(
             ScoreLog.game_id == official_game_id,
             ScoreLog.user_id == scenario.player_one_id,
             ScoreLog.effective_status == ScoreLogEffectiveStatus.EFFECTIVE,
         )
     )
-    assert official_log is not None
-    assert official_log.balance_after == official_log.delta
+    later_fun_log = db_session.scalar(
+        select(ScoreLog).where(
+            ScoreLog.game_id == later_fun_game_id,
+            ScoreLog.user_id == scenario.player_one_id,
+            ScoreLog.effective_status == ScoreLogEffectiveStatus.EFFECTIVE,
+        )
+    )
+    assert revised_official_log is not None and revised_official_log.balance_after == -0.75
+    assert later_fun_log is not None and later_fun_log.balance_after == -0.75
+
+    leaderboard = api_client.get(
+        f"{API_PREFIX}/seasons/{scenario.season_id}/leaderboard",
+        headers=scenario.headers_for(scenario.viewer_id),
+    )
+    assert leaderboard.status_code == 200
+    player_entry = next(
+        entry for entry in leaderboard.json() if entry["user_id"] == scenario.player_one_id
+    )
+    assert player_entry["total_score"] == revised_official_log.balance_after
+
+    second_season = Season(
+        name="Second Integration Season",
+        start_date=date(2027, 1, 1),
+        end_date=date(2027, 12, 31),
+        created_by=scenario.admin_id,
+    )
+    db_session.add(second_season)
+    db_session.flush()
+    second_event_day = EventDay(
+        season_id=second_season.id,
+        title="Second Season Event",
+        event_date=date(2027, 6, 1),
+        venue="Second Test Venue",
+        created_by=scenario.admin_id,
+    )
+    db_session.add(second_event_day)
+    db_session.flush()
+    second_season_game = Game(
+        event_day_id=second_event_day.id,
+        game_number=1,
+        table_number=1,
+        format_id=scenario.format_id,
+        judge_user_id=scenario.judge_id,
+        game_type=GameType.OFFICIAL,
+        status=GameStatus.DRAFT,
+    )
+    db_session.add(second_season_game)
+    db_session.commit()
+    save_and_submit(api_client, scenario, second_season_game.id)
+    confirm(api_client, scenario, second_season_game.id)
+
+    db_session.expire_all()
+    second_season_log = db_session.scalar(
+        select(ScoreLog).where(
+            ScoreLog.game_id == second_season_game.id,
+            ScoreLog.user_id == scenario.player_one_id,
+            ScoreLog.effective_status == ScoreLogEffectiveStatus.EFFECTIVE,
+        )
+    )
+    assert second_season_log is not None
+    assert second_season_log.balance_after == second_season_log.delta == 1.25
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="M6.0C: revising a game recalculates balances only for players still present.",
-)
 def test_revision_recalculates_later_balances_for_removed_player(
     api_client: TestClient,
     db_session: Session,
@@ -211,7 +296,36 @@ def test_revision_recalculates_later_balances_for_removed_player(
     assert before_revision is not None
     assert before_revision.balance_after == 2.5
 
-    replacement_payload = scenario.valid_draft(player_one_id=scenario.replacement_player_id)
+    replacement_payload = {
+        "players": [
+            {
+                "user_id": scenario.player_two_id,
+                "seat_number": 1,
+                "role_name": "Seer",
+                "faction": "good",
+                "final_status": "alive",
+                "is_winner": True,
+                "remarks": "Retained player",
+            },
+            {
+                "user_id": scenario.replacement_player_id,
+                "seat_number": 2,
+                "role_name": "Werewolf",
+                "faction": "wolf",
+                "final_status": "eliminated",
+                "is_winner": False,
+                "remarks": "Added player",
+            },
+        ],
+        "adjustments": [
+            {
+                "target_seat_number": 1,
+                "adjustment_type": "judge_bonus",
+                "delta": 0.25,
+                "reason": "Retained player bonus",
+            }
+        ],
+    }
     response = api_client.post(
         f"{API_PREFIX}/games/{scenario.game_id}/revise-result",
         json={**replacement_payload, "reason": "Remove player from older game"},
@@ -232,6 +346,26 @@ def test_revision_recalculates_later_balances_for_removed_player(
         scenario.replacement_player_id,
         scenario.player_two_id,
     }
+    effective_counts: dict[int, int] = {}
+    for log in revised_game_logs:
+        effective_counts[log.user_id] = effective_counts.get(log.user_id, 0) + 1
+    assert effective_counts == {
+        scenario.replacement_player_id: 1,
+        scenario.player_two_id: 1,
+    }
+    removed_game_logs = list(
+        db_session.scalars(
+            select(ScoreLog).where(
+                ScoreLog.game_id == scenario.game_id,
+                ScoreLog.user_id == scenario.player_one_id,
+            )
+        )
+    )
+    assert removed_game_logs
+    assert all(
+        log.effective_status == ScoreLogEffectiveStatus.VOIDED
+        for log in removed_game_logs
+    )
     later_log = db_session.scalar(
         select(ScoreLog).where(
             ScoreLog.game_id == later_game_id,
@@ -241,6 +375,26 @@ def test_revision_recalculates_later_balances_for_removed_player(
     )
     assert later_log is not None
     assert later_log.balance_after == later_log.delta
+
+    retained_later_log = db_session.scalar(
+        select(ScoreLog).where(
+            ScoreLog.game_id == later_game_id,
+            ScoreLog.user_id == scenario.player_two_id,
+            ScoreLog.effective_status == ScoreLogEffectiveStatus.EFFECTIVE,
+        )
+    )
+    assert retained_later_log is not None
+    assert retained_later_log.balance_after == 0.25
+
+    leaderboard = api_client.get(
+        f"{API_PREFIX}/seasons/{scenario.season_id}/leaderboard",
+        headers=scenario.headers_for(scenario.viewer_id),
+    )
+    assert leaderboard.status_code == 200
+    entries = {entry["user_id"]: entry for entry in leaderboard.json()}
+    assert entries[scenario.player_one_id]["total_score"] == later_log.balance_after
+    assert entries[scenario.player_two_id]["total_score"] == retained_later_log.balance_after
+    assert entries[scenario.replacement_player_id]["total_score"] == -1.0
 
 
 @pytest.mark.xfail(

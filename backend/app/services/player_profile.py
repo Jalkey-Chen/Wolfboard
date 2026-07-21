@@ -3,12 +3,13 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.enums import GameStatus, GameType, ScoreLogEffectiveStatus
+from app.core.enums import GameStatus, ScoreLogEffectiveStatus
 from app.models.event_day import EventDay
 from app.models.game import Game
 from app.models.score_log import ScoreLog
 from app.models.user import User
 from app.schemas.player_profile import PlayerProfileGameRead, PlayerProfileRead
+from app.services.score_log import game_affects_official_standings
 
 
 def get_player_profile_or_404(db: Session, player_id: int) -> User:
@@ -43,7 +44,7 @@ def build_player_profile(db: Session, player_id: int) -> PlayerProfileRead:
     games_played = 0
 
     for score_log, game, event_day in db.execute(statement):
-        if game.game_type == GameType.OFFICIAL:
+        if game_affects_official_standings(game.game_type, game.status):
             total_score += score_log.delta
             games_played += 1
 
@@ -74,4 +75,3 @@ def build_player_profile(db: Session, player_id: int) -> PlayerProfileRead:
         games_played=games_played,
         history=history,
     )
-
