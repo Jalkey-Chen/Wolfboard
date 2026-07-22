@@ -24,6 +24,7 @@ from app.models.role import Role
 from app.models.season import Season
 from app.models.user import User
 from app.models.user_role import UserRole
+from app.services.format_snapshot import freeze_game_format
 
 
 API_PREFIX = "/api/v1"
@@ -189,6 +190,9 @@ def create_result_scenario(
         cancellation_reason="Cancelled integration fixture" if play_status == GamePlayStatus.CANCELLED else None,
     )
     db.add(game)
+    db.flush()
+    if play_status in {GamePlayStatus.IN_PROGRESS, GamePlayStatus.ENDED} or result_status != GameResultStatus.EMPTY:
+        freeze_game_format(db, game, frozen_by_user_id=judge.id, frozen_at=now)
     db.commit()
 
     return ResultScenario(
@@ -236,6 +240,14 @@ def create_additional_game(
         cancellation_reason="Cancelled integration fixture" if play_status == GamePlayStatus.CANCELLED else None,
     )
     db.add(game)
+    db.flush()
+    if play_status in {GamePlayStatus.IN_PROGRESS, GamePlayStatus.ENDED} or result_status != GameResultStatus.EMPTY:
+        freeze_game_format(
+            db,
+            game,
+            frozen_by_user_id=judge_user_id or scenario.judge_id,
+            frozen_at=now,
+        )
     db.commit()
     return game.id
 def save_and_submit(

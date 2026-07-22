@@ -85,6 +85,13 @@ class Game(Base):
 
     event_day = relationship("EventDay", back_populates="games")
     format = relationship("GameFormat", back_populates="games")
+    format_snapshot = relationship(
+        "GameFormatSnapshot",
+        back_populates="game",
+        cascade="all, delete-orphan",
+        uselist=False,
+        single_parent=True,
+    )
     judge = relationship("User", foreign_keys=[judge_user_id], back_populates="judged_games")
     submitter = relationship("User", foreign_keys=[submitted_by], back_populates="submitted_games")
     confirmer = relationship("User", foreign_keys=[confirmed_by], back_populates="confirmed_games")
@@ -164,3 +171,15 @@ class Game(Base):
         """Expose whether any game-player rows currently exist for this game."""
 
         return len(self.players) > 0
+
+    @property
+    def has_format_snapshot(self) -> bool:
+        """Expose whether this game already owns frozen format context."""
+
+        return self.format_snapshot is not None
+
+    @property
+    def format_snapshot_id(self) -> int | None:
+        """Expose the one-to-one snapshot ID without embedding its role rows."""
+
+        return self.format_snapshot.id if self.format_snapshot is not None else None

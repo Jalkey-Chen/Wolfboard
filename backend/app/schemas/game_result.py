@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.enums import GamePlayerFaction, GamePlayerFinalStatus, ScoreAdjustmentType
 from app.schemas.game import GameDetail
-from app.schemas.game_format import FormatRoleRead
+from app.schemas.game_format_context import GameFormatContextRead, GameFormatContextRoleRead
 
 
 class ValidationMessage(BaseModel):
@@ -116,7 +116,8 @@ class GameResultDraftRead(BaseModel):
     game: GameDetail
     players: list[GameResultPlayerRead]
     adjustments: list[GameResultAdjustmentRead]
-    format_roles: list[FormatRoleRead]
+    format_context: GameFormatContextRead
+    format_roles: list[GameFormatContextRoleRead]
     selectable_players: list[SelectablePlayerRead]
     validation: ValidationSummary
     editable: bool

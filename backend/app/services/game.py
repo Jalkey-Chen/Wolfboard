@@ -17,6 +17,7 @@ from app.schemas.game import GameCreate, GameUpdate
 GAME_LOAD_OPTIONS = (
     selectinload(Game.event_day).selectinload(EventDay.season),
     selectinload(Game.format),
+    selectinload(Game.format_snapshot),
     selectinload(Game.judge).selectinload(User.user_roles).selectinload(UserRole.role),
 )
 

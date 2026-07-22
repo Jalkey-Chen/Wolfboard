@@ -8,6 +8,8 @@ from app.core.enums import GamePlayStatus, GameResultStatus
 from app.models.game import Game
 from app.models.game_participant import GameParticipant
 from app.models.game_player import GamePlayer
+from app.models.game_format_role_snapshot import GameFormatRoleSnapshot
+from app.models.game_format_snapshot import GameFormatSnapshot
 from app.scripts.seed import main as seed_main
 
 
@@ -26,6 +28,30 @@ def test_seed_is_idempotent_and_writes_valid_dual_states(db_session: Session) ->
     first_results = list(
         db_session.execute(select(GamePlayer.id, GamePlayer.participant_id).order_by(GamePlayer.id))
     )
+    first_snapshots = list(
+        db_session.execute(
+            select(
+                GameFormatSnapshot.id,
+                GameFormatSnapshot.game_id,
+                GameFormatSnapshot.format_key,
+                GameFormatSnapshot.format_name,
+                GameFormatSnapshot.player_count,
+            ).order_by(GameFormatSnapshot.id)
+        )
+    )
+    first_snapshot_roles = list(
+        db_session.execute(
+            select(
+                GameFormatRoleSnapshot.id,
+                GameFormatRoleSnapshot.format_snapshot_id,
+                GameFormatRoleSnapshot.role_name,
+                GameFormatRoleSnapshot.faction,
+                GameFormatRoleSnapshot.role_count,
+                GameFormatRoleSnapshot.display_order,
+                GameFormatRoleSnapshot.metadata_json,
+            ).order_by(GameFormatRoleSnapshot.id)
+        )
+    )
 
     seed_main()
     db_session.expire_all()
@@ -38,6 +64,30 @@ def test_seed_is_idempotent_and_writes_valid_dual_states(db_session: Session) ->
     assert list(
         db_session.execute(select(GamePlayer.id, GamePlayer.participant_id).order_by(GamePlayer.id))
     ) == first_results
+    assert list(
+        db_session.execute(
+            select(
+                GameFormatSnapshot.id,
+                GameFormatSnapshot.game_id,
+                GameFormatSnapshot.format_key,
+                GameFormatSnapshot.format_name,
+                GameFormatSnapshot.player_count,
+            ).order_by(GameFormatSnapshot.id)
+        )
+    ) == first_snapshots
+    assert list(
+        db_session.execute(
+            select(
+                GameFormatRoleSnapshot.id,
+                GameFormatRoleSnapshot.format_snapshot_id,
+                GameFormatRoleSnapshot.role_name,
+                GameFormatRoleSnapshot.faction,
+                GameFormatRoleSnapshot.role_count,
+                GameFormatRoleSnapshot.display_order,
+                GameFormatRoleSnapshot.metadata_json,
+            ).order_by(GameFormatRoleSnapshot.id)
+        )
+    ) == first_snapshot_roles
 
     games = list(db_session.scalars(select(Game)))
     assert games
@@ -46,6 +96,8 @@ def test_seed_is_idempotent_and_writes_valid_dual_states(db_session: Session) ->
             assert game.started_at is not None
         if game.play_status == GamePlayStatus.ENDED:
             assert game.started_at is not None and game.ended_at is not None
+        if game.play_status in {GamePlayStatus.IN_PROGRESS, GamePlayStatus.ENDED}:
+            assert game.format_snapshot is not None
         if game.result_status in {GameResultStatus.CONFIRMED, GameResultStatus.REVISED}:
             assert game.play_status == GamePlayStatus.ENDED
             assert game.confirmed_at is not None and game.confirmed_by is not None

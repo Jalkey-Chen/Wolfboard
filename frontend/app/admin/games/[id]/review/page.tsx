@@ -138,6 +138,9 @@ export default function AdminGameReviewPage() {
                   <div className={metaLabelClass}>{t("common.playStatus")}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-700">{enumLabel("gamePlayStatus", draft.game.play_status)}</div>
                   <div className="mt-1 text-xs text-slate-500">{t("common.resultStatus")}: {enumLabel("gameResultStatus", draft.game.result_status)}</div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {draft.format_context.is_frozen ? t("games.formatFrozen") : t("games.formatNotFrozen")}
+                  </div>
                   <div className="mt-1 text-xs text-slate-500">{t("resultEntry.submittedAt")} {formatDateTime(draft.game.submitted_at)}</div>
                 </div>
               </div>

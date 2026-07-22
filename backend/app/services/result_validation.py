@@ -9,6 +9,7 @@ from app.schemas.game_result import (
     ValidationMessage,
     ValidationSummary,
 )
+from app.services.format_snapshot import authoritative_format, authoritative_format_roles
 
 
 def _message(code: str, message: str, field: str | None = None) -> ValidationMessage:
@@ -85,8 +86,23 @@ def validate_game_result_payload(
             )
         )
 
-    format_role_names = {format_role.role_name for format_role in game.format.format_roles}
+    format_context = authoritative_format(game)
+    format_roles = list(authoritative_format_roles(game))
+    format_role_names = {format_role.role_name for format_role in format_roles}
     valid_seats = {player.seat_number for player in players if player.seat_number is not None}
+
+    invalid_context_roles = [
+        role for role in format_roles if not role.role_name.strip() or role.role_count <= 0
+    ]
+    configured_role_total = sum(role.role_count for role in format_roles)
+    if not format_roles or invalid_context_roles or configured_role_total != format_context.player_count:
+        errors.append(
+            _message(
+                "invalid_format_context",
+                "The frozen format context has an invalid role composition and cannot validate results.",
+                "players",
+            )
+        )
 
     for index, player in enumerate(players, start=1):
         field_prefix = f"players[{index - 1}]"
@@ -111,7 +127,7 @@ def validate_game_result_payload(
                 )
             )
 
-    expected_player_count = game.format.player_count
+    expected_player_count = format_context.player_count
     actual_player_count = len(players)
     if actual_player_count > 0 and expected_player_count != actual_player_count:
         warnings.append(
@@ -121,6 +137,18 @@ def validate_game_result_payload(
                 "players",
             )
         )
+
+    expected_roles = Counter()
+    for format_role in format_roles:
+        expected_roles[format_role.role_name] += format_role.role_count
+    actual_roles = Counter(player.role_name for player in players if player.role_name)
+    if players and actual_roles != expected_roles:
+        role_message = _message(
+            "role_composition_mismatch",
+            "The result role composition does not match the frozen format context.",
+            "players",
+        )
+        (errors if submit_mode else warnings).append(role_message)
 
     for index, adjustment in enumerate(adjustments, start=1):
         field_prefix = f"adjustments[{index - 1}]"

@@ -21,6 +21,7 @@ EVENT_DAY_LOAD_OPTIONS = (
     selectinload(EventDay.season),
     selectinload(EventDay.registrations).selectinload(Registration.user),
     selectinload(EventDay.games).selectinload(Game.format),
+    selectinload(EventDay.games).selectinload(Game.format_snapshot),
     selectinload(EventDay.games).selectinload(Game.judge).selectinload(User.user_roles).selectinload(UserRole.role),
 )
 

@@ -12,6 +12,7 @@ from app.models.game import Game
 from app.models.game_status_history import GameStatusHistory
 from app.models.user import User
 from app.services.audit import build_game_snapshot, reload_game_for_audit, write_audit_log
+from app.services.format_snapshot import freeze_game_format
 
 
 def lock_game_state(db: Session, game: Game, *, options: Iterable = ()) -> Game:
@@ -181,6 +182,13 @@ def validate_game_state(game: Game) -> None:
         or game.confirmed_by is None
     ):
         raise RuntimeError("A confirmed or revised result requires an ended game and confirmation metadata.")
+    requires_snapshot = (
+        game.play_status in {GamePlayStatus.IN_PROGRESS, GamePlayStatus.ENDED}
+        or (game.play_status == GamePlayStatus.CANCELLED and game.started_at is not None)
+        or game.result_status != GameResultStatus.EMPTY
+    )
+    if requires_snapshot and game.format_snapshot is None:
+        raise RuntimeError("A started or result-bearing game must have frozen format context.")
 
 
 def write_game_state_audit(
@@ -217,6 +225,7 @@ def start_game(db: Session, game: Game, current_user: User) -> Game:
     if game.play_status == GamePlayStatus.IN_PROGRESS:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="The game is already in progress.")
     old_snapshot = build_game_snapshot(game)
+    freeze_game_format(db, game, frozen_by_user_id=current_user.id)
     transition_play_status(
         db,
         game,

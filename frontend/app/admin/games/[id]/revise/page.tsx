@@ -155,7 +155,7 @@ export default function AdminGameRevisionPage() {
     return buildDraftValidation({
       players: playerRows,
       adjustments: adjustmentRows,
-      formatRoles: draft.format_roles,
+      formatRoles: draft.format_context.roles,
       formatPlayerCount: draft.game.format.player_count,
       judgeUserId: draft.game.judge_user_id,
     });
@@ -302,6 +302,9 @@ export default function AdminGameRevisionPage() {
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
                   <div className={metaLabelClass}>{t("common.currentStatus")}</div>
                   <div className="mt-2 text-sm text-slate-700">{enumLabel("gamePlayStatus", draft.game.play_status)} · {enumLabel("gameResultStatus", draft.game.result_status)}</div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {draft.format_context.is_frozen ? t("games.formatFrozen") : t("games.formatNotFrozen")}
+                  </div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
                   <div className={metaLabelClass}>{t("resultEntry.submittedAt")}</div>
@@ -487,7 +490,7 @@ export default function AdminGameRevisionPage() {
                 </table>
               </div>
               <datalist id="admin-format-role-options">
-                {draft.format_roles.map((role) => (
+                {draft.format_context.roles.map((role) => (
                   <option key={role.id} value={role.role_name} />
                 ))}
               </datalist>

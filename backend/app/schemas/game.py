@@ -90,6 +90,8 @@ class GameSummary(BaseModel):
     notes: str | None
     created_at: datetime
     updated_at: datetime
+    has_format_snapshot: bool
+    format_snapshot_id: int | None
 
     model_config = ConfigDict(from_attributes=True)
 

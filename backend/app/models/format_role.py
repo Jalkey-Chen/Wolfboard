@@ -44,3 +44,4 @@ class FormatRole(Base):
     )
 
     format = relationship("GameFormat", back_populates="format_roles")
+    game_role_snapshots = relationship("GameFormatRoleSnapshot", back_populates="source_format_role")

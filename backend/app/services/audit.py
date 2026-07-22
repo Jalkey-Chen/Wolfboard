@@ -20,6 +20,7 @@ from app.models.user import User
 AUDIT_GAME_LOAD_OPTIONS = (
     selectinload(Game.event_day).selectinload(EventDay.season),
     selectinload(Game.format),
+    selectinload(Game.format_snapshot),
     selectinload(Game.judge).selectinload(User.user_roles),
     selectinload(Game.players).selectinload(GamePlayer.participant).selectinload(GameParticipant.user),
     selectinload(Game.players).selectinload(GamePlayer.adjustments),
@@ -125,6 +126,13 @@ def build_game_snapshot(game: Game) -> dict[str, Any]:
                 "table_number": game.table_number,
                 "format_id": game.format_id,
                 "format_name": game.format_name,
+                "format_snapshot_id": game.format_snapshot_id,
+                "format_snapshot_origin": (
+                    game.format_snapshot.snapshot_origin if game.format_snapshot is not None else None
+                ),
+                "format_snapshot_frozen_at": (
+                    game.format_snapshot.frozen_at if game.format_snapshot is not None else None
+                ),
                 "judge_user_id": game.judge_user_id,
                 "judge_display_name": game.judge_display_name,
                 "game_type": game.game_type,

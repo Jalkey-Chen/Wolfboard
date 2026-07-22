@@ -12,6 +12,7 @@ from app.models.game import Game
 from app.models.game_participant import GameParticipant
 from app.models.game_player import GamePlayer
 from app.models.game_format import GameFormat
+from app.models.game_format_snapshot import GameFormatSnapshot
 from app.models.registration import Registration
 from app.models.result_confirmation import ResultConfirmation
 from app.models.score_log import ScoreLog
@@ -33,6 +34,7 @@ GAME_REVIEW_LOAD_OPTIONS = (
     selectinload(Game.event_day).selectinload(EventDay.season),
     selectinload(Game.event_day).selectinload(EventDay.registrations).selectinload(Registration.user),
     selectinload(Game.format).selectinload(GameFormat.format_roles),
+    selectinload(Game.format_snapshot).selectinload(GameFormatSnapshot.roles),
     selectinload(Game.judge).selectinload(User.user_roles).selectinload(UserRole.role),
     selectinload(Game.participants).selectinload(GameParticipant.user),
     selectinload(Game.participants).selectinload(GameParticipant.result).selectinload(GamePlayer.adjustments),

@@ -20,9 +20,11 @@ import {
   cancelGame,
   endGame,
   getGame,
+  getGameFormatContext,
   getGameResultDraft,
   startGame,
   type GameDetail,
+  type GameFormatContext,
   type GameResultDraftResponse,
 } from "@/lib/api";
 import { useAuthenticatedSession } from "@/lib/use-authenticated-session";
@@ -34,6 +36,7 @@ export default function GameDetailPage() {
   const { t, enumLabel, language } = useI18n();
   const { token, profile, isLoading } = useAuthenticatedSession();
   const [game, setGame] = useState<GameDetail | null>(null);
+  const [formatContext, setFormatContext] = useState<GameFormatContext | null>(null);
   const [resultDraft, setResultDraft] = useState<GameResultDraftResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isChangingState, setIsChangingState] = useState(false);
@@ -46,8 +49,11 @@ export default function GameDetailPage() {
       return;
     }
 
-    void getGame(token, gameId)
-      .then((response) => setGame(response))
+    void Promise.all([getGame(token, gameId), getGameFormatContext(token, gameId)])
+      .then(([gameResponse, contextResponse]) => {
+        setGame(gameResponse);
+        setFormatContext(contextResponse);
+      })
       .catch((error) => {
         setErrorMessage(error instanceof Error ? error.message : t("games.loadError"));
       });
@@ -99,6 +105,7 @@ export default function GameDetailPage() {
           ? await endGame(token, game.id)
           : await cancelGame(token, game.id, reason);
       setGame(response);
+      setFormatContext(await getGameFormatContext(token, game.id));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : t("common.failedToLoad"));
     } finally {
@@ -187,7 +194,12 @@ export default function GameDetailPage() {
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
                   <div className={metaLabelClass}>{t("common.format")}</div>
-                  <div className="mt-2 text-sm font-semibold text-slate-700">{game.format.format_name}</div>
+                  <div className="mt-2 text-sm font-semibold text-slate-700">
+                    {formatContext?.format_name ?? game.format.format_name}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {formatContext?.is_frozen ? t("games.formatFrozen") : t("games.formatNotFrozen")}
+                  </div>
                 </div>
                 <div className="rounded-2xl bg-slate-50 px-4 py-4">
                   <div className={metaLabelClass}>{t("common.judge")}</div>
@@ -215,6 +227,41 @@ export default function GameDetailPage() {
                 </div>
               </div>
             </section>
+
+            {formatContext ? (
+              <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-bold text-ink">
+                      {formatContext.is_frozen ? t("games.gameFormatSnapshot") : t("games.liveFormatContext")}
+                    </h2>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {formatContext.is_frozen
+                        ? t("games.snapshotHistoricalHint")
+                        : t("games.liveFormatHint")}
+                    </p>
+                  </div>
+                  {formatContext.source_format_id ? (
+                    <Link className="text-sm font-semibold text-ink underline" href={`/formats/${formatContext.source_format_id}`}>
+                      {t("games.sourceFormat")}
+                    </Link>
+                  ) : null}
+                </div>
+                {formatContext.is_frozen ? (
+                  <div className="mt-4 text-sm text-slate-600">
+                    {t("games.frozenAt")}: {formatDateTime(formatContext.frozen_at)} · {t("games.snapshotOrigin")}: {formatContext.snapshot_origin ?? t("common.notSet")}
+                  </div>
+                ) : null}
+                <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {formatContext.roles.map((role) => (
+                    <div className="border-l-2 border-slate-300 pl-3" key={role.id ?? `live-${role.source_format_role_id}`}>
+                      <div className="text-sm font-semibold text-slate-800">{role.role_name} × {role.role_count}</div>
+                      <div className="mt-1 text-xs text-slate-500">{enumLabel("formatRoleFaction", role.faction)}</div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
 
             <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/50">
               <h2 className="text-2xl font-bold text-ink">{t("games.timingAndNotes")}</h2>

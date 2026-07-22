@@ -279,8 +279,17 @@ password123
 - `GamePlayer` 只保存角色、阵营、最终状态、胜负、积分、备注和调整项，不再重复保存 user 或 seat。
 - 赛果 API 仍扁平返回 `user_id` 与 `seat_number`，并新增 `participant_id`。后续 PUT/revise 应原样回传该 ID。
 - 草稿保存采用 participant reconcile：保留行原地更新，新增行创建，移除行单独删除；完全相同的重复保存会保持 participant 与 result ID 不变。
-- 显示名称在绑定用户时写入 snapshot，用户之后改名不会重写历史显示名。当前尚无游客创建 UI，也尚未冻结角色或版型定义。
-- 架构边界详见 `docs/architecture/game-participants.md`；M6.0D2 将处理不可变历史版型快照。
+- 显示名称在绑定用户时写入 snapshot，用户之后改名不会重写历史显示名。当前尚无游客创建 UI。
+- 架构边界详见 `docs/architecture/game-participants.md`。
+
+### 不可变对局版型快照
+
+- `GameFormat` / `FormatRole` 是 scheduled 阶段使用的可变模板；对局开始后，`GameFormatSnapshot` / `GameFormatRoleSnapshot` 是历史解释的唯一权威。
+- 显式 start 与首次草稿 auto-start 会在同一 Game 行锁事务中校验并复制版型、全部角色与独立 JSON metadata；失败不会留下快照、状态、历史或审计记录。
+- 赛果读取、保存、提交、审核和修订在已有快照时只按快照验证。源版型之后改名、停用或被 seed 重建角色，不会改变历史对局。
+- `GET /api/v1/games/{game_id}/format-context` 明确返回 live 或 frozen context；普通列表只返回 `has_format_snapshot` 与 `format_snapshot_id`。
+- migration `20260722_0009` 为有进行或赛果证据的旧对局回填 `legacy_backfill`。它只能证明迁移时可找到的配置，不保证等于比赛发生时的原始配置。
+- 快照没有修改或删除 API；除物理删除 Game 的级联外，业务和 seed 均不替换快照。详见 `docs/architecture/game-format-snapshots.md`。
 
 ## 常用本地验证流程
 
@@ -346,7 +355,11 @@ password123
 - `GET /api/v1/event-days/{event_day_id}/games`
 - `POST /api/v1/games`
 - `GET /api/v1/games/{game_id}`
+- `GET /api/v1/games/{game_id}/format-context`
 - `PATCH /api/v1/games/{game_id}`
+- `POST /api/v1/games/{game_id}/start`
+- `POST /api/v1/games/{game_id}/end`
+- `POST /api/v1/games/{game_id}/cancel`
 - `GET /api/v1/judges/me/games`
 
 ### 赛果与积分
