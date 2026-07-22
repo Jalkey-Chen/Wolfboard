@@ -41,6 +41,6 @@ Audit snapshots include both states and all lifecycle, submission, confirmation,
 
 ## Configuration Freeze
 
-New `scheduled + empty` games may change their game number, format, and game type. Once play or result entry begins those fields are frozen; table, assigned judge, and notes remain operationally editable. Cancelled games are read-only. M6.0D2 will freeze the selected format into immutable historical snapshots.
+New `scheduled + empty` games may change their game number, format, and game type. Once play or result entry begins those fields are frozen; table, assigned judge, and notes remain operationally editable. Cancelled games are read-only. M6.0D2 freezes the selected format into immutable historical snapshots in the same start transaction.
 
 The first draft save still auto-starts a scheduled game for compatibility with the current judge UI. M6.1 GameEvent entry will use `play_status` directly to decide whether normal gameplay events may be appended and will make start explicit.

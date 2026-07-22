@@ -283,8 +283,17 @@ That means:
 - `GamePlayer` now owns only role, faction, final state, outcome, score, notes, and adjustments. It no longer duplicates user or seat columns.
 - Result APIs still flatten `user_id` and `seat_number` for compatibility and now include `participant_id`; later PUT and revise requests should return that ID unchanged.
 - Draft writes reconcile by participant: retained rows update in place, additions create rows, and removals delete only their own aggregate. Identical repeated saves preserve participant and result IDs.
-- Display names are snapshotted when an account is bound and do not follow later account renames. Guest creation UI and frozen role/format definitions remain deferred.
-- See `docs/architecture/game-participants.md` for the boundary. M6.0D2 will add immutable historical format snapshots.
+- Display names are snapshotted when an account is bound and do not follow later account renames. Guest creation UI remains deferred.
+- See `docs/architecture/game-participants.md` for the boundary.
+
+### Immutable per-game format snapshots
+
+- `GameFormat` / `FormatRole` are mutable templates for scheduled games. After start, `GameFormatSnapshot` / `GameFormatRoleSnapshot` are the sole historical authority.
+- Explicit start and first-draft auto-start validate and copy the format, every role row, and independent JSON metadata inside the same Game row-lock transaction. Failure leaves no snapshot, state, history, or audit side effects.
+- Result read, save, submit, review, and revision use the snapshot whenever one exists. Later source renames, deactivation, or seed role replacement cannot reinterpret historical games.
+- `GET /api/v1/games/{game_id}/format-context` explicitly returns live or frozen context. List payloads expose only `has_format_snapshot` and `format_snapshot_id`.
+- Migration `20260722_0009` creates `legacy_backfill` snapshots for games with play or result evidence. They represent the template available during migration, not provable event-time configuration.
+- Snapshots have no mutation API. Services and seed do not replace them; only physical Game deletion cascades. See `docs/architecture/game-format-snapshots.md`.
 
 ## Useful Local Verification Flows
 
@@ -350,7 +359,11 @@ This is only a compact list of key routes:
 - `GET /api/v1/event-days/{event_day_id}/games`
 - `POST /api/v1/games`
 - `GET /api/v1/games/{game_id}`
+- `GET /api/v1/games/{game_id}/format-context`
 - `PATCH /api/v1/games/{game_id}`
+- `POST /api/v1/games/{game_id}/start`
+- `POST /api/v1/games/{game_id}/end`
+- `POST /api/v1/games/{game_id}/cancel`
 - `GET /api/v1/judges/me/games`
 
 ### Results and scoring
