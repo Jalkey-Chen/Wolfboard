@@ -38,6 +38,7 @@ from app.models.season import Season
 from app.models.score_adjustment import ScoreAdjustment
 from app.models.user import User
 from app.models.user_role import UserRole
+from app.services.format_snapshot import freeze_game_format
 
 
 ROLE_SEED = [
@@ -735,7 +736,8 @@ def seed_games() -> None:
                 )
                 db.add(game)
 
-            game.format_id = game_format.id
+            if game.format_snapshot is None:
+                game.format_id = game_format.id
             game.judge_user_id = judge_user.id
             game.game_type = game_payload["game_type"]
             game.play_status = game_payload["play_status"]
@@ -761,6 +763,18 @@ def seed_games() -> None:
                 game.confirmed_by = None
 
         db.flush()
+        for game in db.scalars(select(Game).where(Game.notes.like(f"{SEEDED_GAME_NOTE_PREFIX}%"))):
+            if (
+                game.play_status in {GamePlayStatus.IN_PROGRESS, GamePlayStatus.ENDED}
+                or game.result_status != GameResultStatus.EMPTY
+            ):
+                freeze_game_format(
+                    db,
+                    game,
+                    frozen_by_user_id=game.judge_user_id,
+                    frozen_at=game.started_at,
+                )
+
         sample_game = db.scalar(
             select(Game).where(
                 Game.notes == f"{SEEDED_GAME_NOTE_PREFIX}：正式局第 3 轮。",
