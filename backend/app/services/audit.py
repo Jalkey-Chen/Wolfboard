@@ -12,7 +12,6 @@ from app.models.event_day import EventDay
 from app.models.game import Game
 from app.models.game_participant import GameParticipant
 from app.models.game_player import GamePlayer
-from app.models.game_format_snapshot import GameFormatSnapshot
 from app.models.score_adjustment import ScoreAdjustment
 from app.models.score_log import ScoreLog
 from app.models.user import User
@@ -21,7 +20,7 @@ from app.models.user import User
 AUDIT_GAME_LOAD_OPTIONS = (
     selectinload(Game.event_day).selectinload(EventDay.season),
     selectinload(Game.format),
-    selectinload(Game.format_snapshot).selectinload(GameFormatSnapshot.roles),
+    selectinload(Game.format_snapshot),
     selectinload(Game.judge).selectinload(User.user_roles),
     selectinload(Game.players).selectinload(GamePlayer.participant).selectinload(GameParticipant.user),
     selectinload(Game.players).selectinload(GamePlayer.adjustments),

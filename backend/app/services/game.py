@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.event_day import EventDay
 from app.models.game import Game
 from app.models.game_format import GameFormat
-from app.models.game_format_snapshot import GameFormatSnapshot
 from app.models.user import User
 from app.models.user_role import UserRole
 from app.core.enums import GamePlayStatus, GameResultStatus
@@ -18,7 +17,7 @@ from app.schemas.game import GameCreate, GameUpdate
 GAME_LOAD_OPTIONS = (
     selectinload(Game.event_day).selectinload(EventDay.season),
     selectinload(Game.format),
-    selectinload(Game.format_snapshot).selectinload(GameFormatSnapshot.roles),
+    selectinload(Game.format_snapshot),
     selectinload(Game.judge).selectinload(User.user_roles).selectinload(UserRole.role),
 )
 
