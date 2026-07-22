@@ -27,6 +27,12 @@ type EnumGroup =
   | "gameType"
   | "gamePlayStatus"
   | "gameResultStatus"
+  | "gameEventPhase"
+  | "gameEventSource"
+  | "gameEventVisibility"
+  | "gameEventStatus"
+  | "gameEventType"
+  | "gameDeathCause"
   | "gamePlayerFaction"
   | "gamePlayerFinalStatus"
   | "scoreAdjustmentType";
@@ -687,6 +693,58 @@ const enumTranslations: Record<EnumGroup, Record<string, Record<Language, string
     rejected: { zh: "已驳回", en: "Rejected" },
     confirmed: { zh: "已确认", en: "Confirmed" },
     revised: { zh: "已修订", en: "Revised" },
+  },
+  gameEventPhase: {
+    night: { zh: "夜晚", en: "Night" },
+    day: { zh: "白天", en: "Day" },
+  },
+  gameEventSource: {
+    manual: { zh: "手工录入", en: "Manual" },
+    system: { zh: "系统生成", en: "System" },
+    imported: { zh: "历史导入", en: "Imported" },
+  },
+  gameEventVisibility: {
+    public: { zh: "公开", en: "Public" },
+    postgame_full: { zh: "赛后完整复盘", en: "Postgame Full" },
+    judge_only: { zh: "仅主持人与管理员", en: "Judge Only" },
+  },
+  gameEventStatus: {
+    active: { zh: "生效", en: "Active" },
+    superseded: { zh: "已被纠正", en: "Superseded" },
+    voided: { zh: "已作废", en: "Voided" },
+  },
+  gameEventType: {
+    phase_started: { zh: "阶段开始", en: "Phase Started" },
+    phase_completed: { zh: "阶段完成", en: "Phase Completed" },
+    wolf_kill_selected: { zh: "狼人确认刀口", en: "Wolf Kill Selected" },
+    seer_checked: { zh: "预言家查验", en: "Seer Checked" },
+    witch_saved: { zh: "女巫救人", en: "Witch Saved" },
+    witch_poisoned: { zh: "女巫毒人", en: "Witch Poisoned" },
+    guard_protected: { zh: "守卫守护", en: "Guard Protected" },
+    night_resolved: { zh: "夜间结算", en: "Night Resolved" },
+    sheriff_candidate_declared: { zh: "宣布竞选警长", en: "Sheriff Candidate Declared" },
+    sheriff_candidate_withdrew: { zh: "退出警长竞选", en: "Sheriff Candidate Withdrew" },
+    sheriff_vote_cast: { zh: "警长投票", en: "Sheriff Vote Cast" },
+    sheriff_elected: { zh: "警长产生", en: "Sheriff Elected" },
+    exile_vote_cast: { zh: "放逐投票", en: "Exile Vote Cast" },
+    vote_tied: { zh: "投票平票", en: "Vote Tied" },
+    exile_revote_started: { zh: "放逐重新投票", en: "Exile Revote Started" },
+    player_exiled: { zh: "玩家被放逐", en: "Player Exiled" },
+    hunter_shot: { zh: "猎人开枪", en: "Hunter Shot" },
+    wolf_self_exploded: { zh: "狼人自爆", en: "Wolf Self-Exploded" },
+    wolf_king_shot: { zh: "狼王开枪", en: "Wolf King Shot" },
+    sheriff_badge_transferred: { zh: "警徽移交", en: "Sheriff Badge Transferred" },
+    sheriff_badge_destroyed: { zh: "警徽撕毁", en: "Sheriff Badge Destroyed" },
+    player_died: { zh: "玩家死亡", en: "Player Died" },
+  },
+  gameDeathCause: {
+    wolf_kill: { zh: "狼刀", en: "Wolf Kill" },
+    witch_poison: { zh: "女巫毒杀", en: "Witch Poison" },
+    exile: { zh: "放逐", en: "Exile" },
+    hunter_shot: { zh: "猎人枪杀", en: "Hunter Shot" },
+    wolf_king_shot: { zh: "狼王枪杀", en: "Wolf King Shot" },
+    self_explosion: { zh: "自爆", en: "Self-Explosion" },
+    other: { zh: "其他", en: "Other" },
   },
   gamePlayerFaction: {
     good: { zh: "好人", en: "Good" },

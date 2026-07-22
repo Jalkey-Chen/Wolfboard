@@ -295,6 +295,15 @@ That means:
 - Migration `20260722_0009` creates `legacy_backfill` snapshots for games with play or result evidence. They represent the template available during migration, not provable event-time configuration.
 - Snapshots have no mutation API. Services and seed do not replace them; only physical Game deletion cascades. See `docs/architecture/game-format-snapshots.md`.
 
+### Structured game-event ledger
+
+- `GameEvent` records in-game actions and resolved facts without duplicating Game lifecycle, result review, scoring, or state history. Normal appends are facts; only correction and void operations also write AuditLog.
+- `sequence_no` is immutable ledger order and `logical_sequence_no` is effective timeline position. Correction appends a replacement at the same logical position and retains the old version as `superseded`; void retains the original body as `voided`.
+- A Game row lock and `next_event_sequence` serialize allocation. `client_event_id` provides per-game retry idempotency, and a partial unique index permits at most one active version per logical position.
+- Event actors and targets use stable `GameParticipant` rows and require frozen format context. Once any event references a participant, result drafts cannot delete it or change its user/seat binding.
+- M6.1 permits only admins and the assigned judge to read or write. Submission locks the ledger and rejection reopens it. Skill, phase, death-causality, and victory rules are not executed.
+- See `docs/architecture/game-event-ledger.md` for the complete V1 taxonomy, payload contracts, visibility, and concurrency semantics.
+
 ## Useful Local Verification Flows
 
 ### Sign-in check
@@ -379,6 +388,14 @@ This is only a compact list of key routes:
 - `GET /api/v1/players/{player_id}/profile`
 - `GET /api/v1/audit-logs`
 
+### Game events
+
+- `GET /api/v1/games/{game_id}/events`
+- `GET /api/v1/games/{game_id}/events/{event_id}`
+- `POST /api/v1/games/{game_id}/events`
+- `POST /api/v1/games/{game_id}/events/{event_id}/correct`
+- `POST /api/v1/games/{game_id}/events/{event_id}/void`
+
 ## Migrations
 
 Run migrations:
@@ -449,7 +466,8 @@ M6.0C converts the final strict xfail (a repeated draft save changing `GamePlaye
 
 Still deferred:
 
-- event-flow recording
+- judge event-entry UI
+- event replay state and public/full replay projections
 - automatic adjudication
 - replay tooling
 - complex rules engine

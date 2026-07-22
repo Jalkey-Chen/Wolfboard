@@ -41,6 +41,41 @@ export type GameResultStatus =
   | "rejected"
   | "confirmed"
   | "revised";
+export type GameEventPhase = "night" | "day";
+export type GameEventSource = "manual" | "system" | "imported";
+export type GameEventVisibility = "public" | "postgame_full" | "judge_only";
+export type GameEventStatus = "active" | "superseded" | "voided";
+export type GameEventType =
+  | "phase_started"
+  | "phase_completed"
+  | "wolf_kill_selected"
+  | "seer_checked"
+  | "witch_saved"
+  | "witch_poisoned"
+  | "guard_protected"
+  | "night_resolved"
+  | "sheriff_candidate_declared"
+  | "sheriff_candidate_withdrew"
+  | "sheriff_vote_cast"
+  | "sheriff_elected"
+  | "exile_vote_cast"
+  | "vote_tied"
+  | "exile_revote_started"
+  | "player_exiled"
+  | "hunter_shot"
+  | "wolf_self_exploded"
+  | "wolf_king_shot"
+  | "sheriff_badge_transferred"
+  | "sheriff_badge_destroyed"
+  | "player_died";
+export type GameDeathCause =
+  | "wolf_kill"
+  | "witch_poison"
+  | "exile"
+  | "hunter_shot"
+  | "wolf_king_shot"
+  | "self_explosion"
+  | "other";
 
 export type UserPayload = {
   id: number;
@@ -302,6 +337,65 @@ export type GameResultDraftResponse = {
   selectable_players: SelectablePlayerRecord[];
   validation: ValidationSummary;
   editable: boolean;
+};
+
+export type GameEventBodyPayload = {
+  phase: GameEventPhase;
+  round_no: number;
+  event_type: GameEventType;
+  actor_participant_id?: number | null;
+  target_participant_id?: number | null;
+  secondary_target_participant_id?: number | null;
+  payload?: Record<string, unknown>;
+  occurred_at?: string | null;
+  client_event_id?: string | null;
+};
+
+export type GameEventCorrectionPayload = GameEventBodyPayload & {
+  reason: string;
+};
+
+export type GameEventParticipantSummary = {
+  participant_id: number;
+  seat_number: number | null;
+  display_name_snapshot: string | null;
+};
+
+export type GameEventUserSummary = {
+  user_id: number;
+  username: string;
+  display_name: string;
+};
+
+export type GameEventRecord = {
+  id: number;
+  game_id: number;
+  sequence_no: number;
+  logical_sequence_no: number;
+  phase: GameEventPhase;
+  round_no: number;
+  event_type: GameEventType;
+  actor_participant_id: number | null;
+  target_participant_id: number | null;
+  secondary_target_participant_id: number | null;
+  actor: GameEventParticipantSummary | null;
+  target: GameEventParticipantSummary | null;
+  secondary_target: GameEventParticipantSummary | null;
+  payload: Record<string, unknown>;
+  visibility: GameEventVisibility;
+  source: GameEventSource;
+  schema_version: number;
+  status: GameEventStatus;
+  supersedes_event_id: number | null;
+  revision_reason: string | null;
+  invalidated_at: string | null;
+  invalidated_by_user_id: number | null;
+  invalidation_reason: string | null;
+  created_by_user_id: number;
+  created_by: GameEventUserSummary;
+  created_at: string;
+  occurred_at: string | null;
+  client_event_id: string | null;
 };
 
 export type GameConfirmPayload = {
@@ -731,6 +825,77 @@ export function endGame(token: string, gameId: number): Promise<GameDetail> {
 
 export function cancelGame(token: string, gameId: number, reason: string): Promise<GameDetail> {
   return request<GameDetail>(`/games/${gameId}/cancel`, withAuth(token, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  }));
+}
+
+
+export function listGameEvents(
+  token: string,
+  gameId: number,
+  options: {
+    view?: "effective" | "ledger";
+    afterLedgerSequence?: number;
+    afterLogicalSequence?: number;
+    limit?: number;
+  } = {},
+): Promise<GameEventRecord[]> {
+  const params = new URLSearchParams();
+  if (options.view) params.set("view", options.view);
+  if (options.afterLedgerSequence !== undefined) {
+    params.set("after_ledger_sequence", String(options.afterLedgerSequence));
+  }
+  if (options.afterLogicalSequence !== undefined) {
+    params.set("after_logical_sequence", String(options.afterLogicalSequence));
+  }
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  const query = params.size > 0 ? `?${params.toString()}` : "";
+  return request<GameEventRecord[]>(`/games/${gameId}/events${query}`, withAuth(token));
+}
+
+
+export function getGameEvent(
+  token: string,
+  gameId: number,
+  eventId: number,
+): Promise<GameEventRecord> {
+  return request<GameEventRecord>(`/games/${gameId}/events/${eventId}`, withAuth(token));
+}
+
+
+export function createGameEvent(
+  token: string,
+  gameId: number,
+  payload: GameEventBodyPayload,
+): Promise<GameEventRecord> {
+  return request<GameEventRecord>(`/games/${gameId}/events`, withAuth(token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }));
+}
+
+
+export function correctGameEvent(
+  token: string,
+  gameId: number,
+  eventId: number,
+  payload: GameEventCorrectionPayload,
+): Promise<GameEventRecord> {
+  return request<GameEventRecord>(`/games/${gameId}/events/${eventId}/correct`, withAuth(token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }));
+}
+
+
+export function voidGameEvent(
+  token: string,
+  gameId: number,
+  eventId: number,
+  reason: string,
+): Promise<GameEventRecord> {
+  return request<GameEventRecord>(`/games/${gameId}/events/${eventId}/void`, withAuth(token, {
     method: "POST",
     body: JSON.stringify({ reason }),
   }));

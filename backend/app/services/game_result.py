@@ -42,6 +42,7 @@ from app.services.game_state import (
     validate_game_state,
     write_game_state_audit,
 )
+from app.services.game_event import get_event_referenced_participant_ids
 
 
 GAME_RESULT_LOAD_OPTIONS = (
@@ -312,6 +313,21 @@ def reconcile_game_result_rows(db: Session, game: Game, payload: GameResultDraft
 
     retained_ids = {participant.id for _, participant in resolved if participant is not None}
     removed_participants = [participant for participant in game.participants if participant.id not in retained_ids]
+    event_referenced_ids = get_event_referenced_participant_ids(db, game.id)
+    for player_input, participant in resolved:
+        if participant is None or participant.id not in event_referenced_ids:
+            continue
+        if (
+            participant.user_id != player_input.user_id
+            or participant.seat_number != player_input.seat_number
+        ):
+            _participant_conflict(
+                "A participant referenced by the event ledger cannot change user or seat."
+            )
+    if any(participant.id in event_referenced_ids for participant in removed_participants):
+        _participant_conflict(
+            "A participant referenced by the event ledger cannot be removed from the result draft."
+        )
 
     # Clear changing unique values in one flush so swaps and cycles cannot trip
     # the final-state uniqueness constraints halfway through the reconcile.

@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum as SqlEnum, ForeignKey, String, Text, UniqueConstraint, func
+from sqlalchemy import CheckConstraint, DateTime, Enum as SqlEnum, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.enums import GamePlayStatus, GameResultStatus, GameType
@@ -25,6 +25,7 @@ class Game(Base):
             "game_number",
             name="uq_games_event_day_id_table_number_game_number",
         ),
+        CheckConstraint("next_event_sequence >= 1", name="ck_games_next_event_sequence"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -71,6 +72,7 @@ class Game(Base):
     cancelled_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     cancellation_reason: Mapped[str | None] = mapped_column(Text(), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    next_event_sequence: Mapped[int] = mapped_column(Integer(), default=1, server_default="1", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -126,6 +128,13 @@ class Game(Base):
         back_populates="game",
         cascade="all, delete-orphan",
         order_by="GameStatusHistory.created_at.desc()",
+    )
+    events = relationship(
+        "GameEvent",
+        back_populates="game",
+        cascade="all, delete-orphan",
+        order_by="GameEvent.sequence_no.asc()",
+        foreign_keys="GameEvent.game_id",
     )
 
     @property

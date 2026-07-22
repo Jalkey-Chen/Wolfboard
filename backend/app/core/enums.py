@@ -118,6 +118,76 @@ class GameStatusScope(str, Enum):
     RESULT = "result"
 
 
+class GameEventPhase(str, Enum):
+    """In-game phase attached to a structured event."""
+
+    NIGHT = "night"
+    DAY = "day"
+
+
+class GameEventSource(str, Enum):
+    """Origin of an event-ledger row."""
+
+    MANUAL = "manual"
+    SYSTEM = "system"
+    IMPORTED = "imported"
+
+
+class GameEventVisibility(str, Enum):
+    """Audience policy attached by the server-side event registry."""
+
+    PUBLIC = "public"
+    POSTGAME_FULL = "postgame_full"
+    JUDGE_ONLY = "judge_only"
+
+
+class GameEventStatus(str, Enum):
+    """Immutable event-version lifecycle."""
+
+    ACTIVE = "active"
+    SUPERSEDED = "superseded"
+    VOIDED = "voided"
+
+
+class GameEventType(str, Enum):
+    """V1 structured in-game event taxonomy."""
+
+    PHASE_STARTED = "phase_started"
+    PHASE_COMPLETED = "phase_completed"
+    WOLF_KILL_SELECTED = "wolf_kill_selected"
+    SEER_CHECKED = "seer_checked"
+    WITCH_SAVED = "witch_saved"
+    WITCH_POISONED = "witch_poisoned"
+    GUARD_PROTECTED = "guard_protected"
+    NIGHT_RESOLVED = "night_resolved"
+    SHERIFF_CANDIDATE_DECLARED = "sheriff_candidate_declared"
+    SHERIFF_CANDIDATE_WITHDREW = "sheriff_candidate_withdrew"
+    SHERIFF_VOTE_CAST = "sheriff_vote_cast"
+    SHERIFF_ELECTED = "sheriff_elected"
+    EXILE_VOTE_CAST = "exile_vote_cast"
+    VOTE_TIED = "vote_tied"
+    EXILE_REVOTE_STARTED = "exile_revote_started"
+    PLAYER_EXILED = "player_exiled"
+    HUNTER_SHOT = "hunter_shot"
+    WOLF_SELF_EXPLODED = "wolf_self_exploded"
+    WOLF_KING_SHOT = "wolf_king_shot"
+    SHERIFF_BADGE_TRANSFERRED = "sheriff_badge_transferred"
+    SHERIFF_BADGE_DESTROYED = "sheriff_badge_destroyed"
+    PLAYER_DIED = "player_died"
+
+
+class GameDeathCause(str, Enum):
+    """V1 structural death-cause vocabulary."""
+
+    WOLF_KILL = "wolf_kill"
+    WITCH_POISON = "witch_poison"
+    EXILE = "exile"
+    HUNTER_SHOT = "hunter_shot"
+    WOLF_KING_SHOT = "wolf_king_shot"
+    SELF_EXPLOSION = "self_explosion"
+    OTHER = "other"
+
+
 class GamePlayerFaction(str, Enum):
     """Faction values stored for player rows in a game result."""
 
