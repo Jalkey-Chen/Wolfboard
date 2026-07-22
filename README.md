@@ -291,6 +291,15 @@ password123
 - migration `20260722_0009` 为有进行或赛果证据的旧对局回填 `legacy_backfill`。它只能证明迁移时可找到的配置，不保证等于比赛发生时的原始配置。
 - 快照没有修改或删除 API；除物理删除 Game 的级联外，业务和 seed 均不替换快照。详见 `docs/architecture/game-format-snapshots.md`。
 
+### 结构化对局事件账本
+
+- `GameEvent` 记录局内动作与结算事实，不重复 Game 生命周期、赛果审核、积分或状态历史；普通追加不重复写 AuditLog，纠正和作废会写审计。
+- `sequence_no` 是不可变账本顺序，`logical_sequence_no` 是有效时间线位置。纠正会追加新版本并继承逻辑位置，原版本保留为 `superseded`；作废保留原文并标记 `voided`。
+- Game 行锁与 `next_event_sequence` 串行分配序号；`client_event_id` 提供局内幂等，数据库 partial unique index 保证每个逻辑位置最多一个 active 版本。
+- 事件 actor/target 使用稳定 `GameParticipant`，并依赖冻结版型快照。participant 一旦被任意事件引用，当前草稿流程不再允许删除或修改其 user/seat。
+- M6.1 仅允许管理员和本局主持人读取或写入；赛果 submitted 后锁定，reject 后重新开放。当前不执行技能、阶段、死亡因果或胜负规则。
+- 完整 V1 taxonomy、payload、可见性和并发语义见 `docs/architecture/game-event-ledger.md`。
+
 ## 常用本地验证流程
 
 ### 1. 登录验证
@@ -375,6 +384,14 @@ password123
 - `GET /api/v1/players/{player_id}/profile`
 - `GET /api/v1/audit-logs`
 
+### 对局事件
+
+- `GET /api/v1/games/{game_id}/events`
+- `GET /api/v1/games/{game_id}/events/{event_id}`
+- `POST /api/v1/games/{game_id}/events`
+- `POST /api/v1/games/{game_id}/events/{event_id}/correct`
+- `POST /api/v1/games/{game_id}/events/{event_id}/void`
+
 ## 数据库迁移
 
 执行迁移：
@@ -445,7 +462,8 @@ M6.0C 已将最后一条 strict xfail（重复保存草稿导致 `GamePlayer.id`
 
 当前仍未实现：
 
-- 事件流录入
+- 主持人事件录入页面
+- 事件状态重放与公开/完整复盘 projection
 - 自动裁判 / 自动胜负推导
 - 复盘回放系统
 - 复杂规则引擎
