@@ -76,6 +76,13 @@ class FormatRoleFaction(str, Enum):
     SPECIAL = "special"
 
 
+class FormatSnapshotOrigin(str, Enum):
+    """Provenance of a per-game immutable format snapshot."""
+
+    RUNTIME_FREEZE = "runtime_freeze"
+    LEGACY_BACKFILL = "legacy_backfill"
+
+
 class GameType(str, Enum):
     """Classification for how a game should be treated operationally."""
 

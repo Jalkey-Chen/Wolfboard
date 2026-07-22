@@ -51,3 +51,4 @@ class GameFormat(Base):
         order_by="FormatRole.display_order.asc()",
     )
     games = relationship("Game", back_populates="format")
+    game_snapshots = relationship("GameFormatSnapshot", back_populates="source_format")
