@@ -6,6 +6,7 @@ from app.api.routes import auth
 from app.api.routes import audit_logs
 from app.api.routes import event_days
 from app.api.routes import formats
+from app.api.routes import game_events
 from app.api.routes import games
 from app.api.routes import players
 from app.api.routes import registrations
@@ -20,4 +21,5 @@ api_router.include_router(event_days.router)
 api_router.include_router(registrations.router)
 api_router.include_router(formats.router)
 api_router.include_router(games.router)
+api_router.include_router(game_events.router)
 api_router.include_router(players.router)
