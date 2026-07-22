@@ -10,6 +10,7 @@ from app.models.user import User
 from app.schemas.game import GameCancelRequest, GameCreate, GameDetail, GameSummary, JudgeOptionRead, GameUpdate
 from app.schemas.game_review import GameConfirmRequest, GameRejectRequest, GameReviewSummary, GameRevisionWrite
 from app.schemas.game_result import GameResultDraftRead, GameResultDraftWrite
+from app.schemas.game_format_context import GameFormatContextRead
 from app.services.event_day import get_event_day_or_404
 from app.services.game import create_game, get_game_or_404, list_games_for_event_day, list_games_for_judge, update_game
 from app.services.game_review import (
@@ -27,6 +28,7 @@ from app.services.game_result import (
     submit_game_result,
 )
 from app.services.game_state import cancel_game, end_game, start_game
+from app.services.format_snapshot import build_game_format_context, get_game_format_context_or_404
 from app.services.user_directory import list_judge_capable_users
 
 
@@ -95,6 +97,18 @@ def read_game(
     """Return a game detail payload with internal fields filtered by role."""
 
     return build_game_detail_payload(game_id, db, current_user)
+
+
+@router.get("/games/{game_id}/format-context", response_model=GameFormatContextRead)
+def read_game_format_context(
+    game_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> GameFormatContextRead:
+    """Return live pre-start or immutable started-game format context."""
+
+    _ = current_user
+    return build_game_format_context(get_game_format_context_or_404(db, game_id))
 
 
 @router.get("/admin/games/review", response_model=list[GameReviewSummary])

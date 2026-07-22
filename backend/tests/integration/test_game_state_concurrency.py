@@ -12,6 +12,8 @@ from app.core.enums import GamePlayStatus, GameResultStatus
 from app.models.audit_log import AuditLog
 from app.models.game import Game
 from app.models.game_status_history import GameStatusHistory
+from app.models.game_format_role_snapshot import GameFormatRoleSnapshot
+from app.models.game_format_snapshot import GameFormatSnapshot
 from app.models.result_confirmation import ResultConfirmation
 from app.models.user import User
 from app.schemas.game_result import GameResultDraftWrite
@@ -110,6 +112,68 @@ def test_concurrent_start_allows_one_play_transition(
     assert db_session.scalar(
         select(func.count(GameStatusHistory.id)).where(GameStatusHistory.game_id == scenario.game_id)
     ) == 1
+    assert db_session.scalar(
+        select(func.count(AuditLog.id)).where(AuditLog.entity_id == scenario.game_id)
+    ) == 1
+    snapshot_id = db_session.scalar(
+        select(GameFormatSnapshot.id).where(GameFormatSnapshot.game_id == scenario.game_id)
+    )
+    assert snapshot_id is not None
+    assert db_session.scalar(
+        select(func.count(GameFormatRoleSnapshot.id)).where(
+            GameFormatRoleSnapshot.format_snapshot_id == snapshot_id
+        )
+    ) == 2
+
+
+def test_concurrent_first_draft_saves_create_one_snapshot_and_result_version(
+    db_session: Session,
+    test_session_factory: sessionmaker[Session],
+) -> None:
+    scenario = create_result_scenario(db_session)
+
+    with test_session_factory() as winning_session:
+        game = get_game_result_or_404(winning_session, scenario.game_id)
+        judge = winning_session.get(User, scenario.judge_id)
+        assert judge is not None
+        winning_session.execute(
+            select(Game).where(Game.id == scenario.game_id).with_for_update()
+        ).scalar_one()
+        loaded = Event()
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(
+                _run_draft_save,
+                test_session_factory,
+                game_id=scenario.game_id,
+                judge_id=scenario.judge_id,
+                payload=scenario.valid_draft(),
+                loaded=loaded,
+            )
+            assert loaded.wait(timeout=5)
+            save_game_result_draft(
+                winning_session,
+                game,
+                GameResultDraftWrite.model_validate(scenario.valid_draft()),
+                judge,
+            )
+            assert future.result(timeout=5) == 409
+
+    db_session.expire_all()
+    snapshot_id = db_session.scalar(
+        select(GameFormatSnapshot.id).where(GameFormatSnapshot.game_id == scenario.game_id)
+    )
+    assert snapshot_id is not None
+    assert db_session.scalar(
+        select(func.count(GameFormatSnapshot.id)).where(GameFormatSnapshot.game_id == scenario.game_id)
+    ) == 1
+    assert db_session.scalar(
+        select(func.count(GameFormatRoleSnapshot.id)).where(
+            GameFormatRoleSnapshot.format_snapshot_id == snapshot_id
+        )
+    ) == 2
+    assert db_session.scalar(
+        select(func.count(GameStatusHistory.id)).where(GameStatusHistory.game_id == scenario.game_id)
+    ) == 2
     assert db_session.scalar(
         select(func.count(AuditLog.id)).where(AuditLog.entity_id == scenario.game_id)
     ) == 1

@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.game import Game
+from app.models.game_format_snapshot import GameFormatSnapshot
 from app.models.event_day import EventDay
 from app.models.registration import Registration
 from app.models.season import Season
@@ -21,6 +22,7 @@ EVENT_DAY_LOAD_OPTIONS = (
     selectinload(EventDay.season),
     selectinload(EventDay.registrations).selectinload(Registration.user),
     selectinload(EventDay.games).selectinload(Game.format),
+    selectinload(EventDay.games).selectinload(Game.format_snapshot).selectinload(GameFormatSnapshot.roles),
     selectinload(EventDay.games).selectinload(Game.judge).selectinload(User.user_roles).selectinload(UserRole.role),
 )
 

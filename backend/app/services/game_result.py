@@ -18,7 +18,6 @@ from app.models.score_adjustment import ScoreAdjustment
 from app.models.user import User
 from app.models.user_role import UserRole
 from app.schemas.game import GameDetail, GameSummary
-from app.schemas.game_format import FormatRoleRead
 from app.schemas.game_result import (
     GameResultAdjustmentRead,
     GameResultDraftRead,
@@ -30,6 +29,11 @@ from app.schemas.game_result import (
 )
 from app.services.result_scoring import calculate_adjustment_score, calculate_base_score, calculate_final_score
 from app.services.result_validation import validate_game_result_payload
+from app.services.format_snapshot import (
+    FORMAT_SNAPSHOT_LOAD_OPTIONS,
+    build_game_format_context,
+    freeze_game_format,
+)
 from app.services.audit import build_game_snapshot
 from app.services.game_state import (
     lock_game_state,
@@ -44,6 +48,7 @@ GAME_RESULT_LOAD_OPTIONS = (
     selectinload(Game.event_day).selectinload(EventDay.season),
     selectinload(Game.event_day).selectinload(EventDay.registrations).selectinload(Registration.user),
     selectinload(Game.format).selectinload(GameFormat.format_roles),
+    *FORMAT_SNAPSHOT_LOAD_OPTIONS,
     selectinload(Game.judge).selectinload(User.user_roles).selectinload(UserRole.role),
     selectinload(Game.participants).selectinload(GameParticipant.user),
     selectinload(Game.participants).selectinload(GameParticipant.result).selectinload(GamePlayer.adjustments),
@@ -191,6 +196,7 @@ def build_game_result_response(game: Game, current_user: User) -> GameResultDraf
 
     payload, validation = _build_validation(game)
     _ = payload
+    format_context = build_game_format_context(game)
     return GameResultDraftRead(
         game=_build_game_detail(game, current_user),
         players=[GameResultPlayerRead.model_validate(player) for player in _sorted_players(game)],
@@ -199,7 +205,8 @@ def build_game_result_response(game: Game, current_user: User) -> GameResultDraf
             for player in _sorted_players(game)
             for adjustment in player.adjustments
         ],
-        format_roles=[FormatRoleRead.model_validate(format_role) for format_role in game.format.format_roles],
+        format_context=format_context,
+        format_roles=format_context.roles,
         selectable_players=_build_selectable_players(game),
         validation=validation,
         editable=(
@@ -409,11 +416,13 @@ def save_game_result_draft(db: Session, game: Game, payload: GameResultDraftWrit
 
     game = lock_game_state(db, game, options=GAME_RESULT_LOAD_OPTIONS)
     ensure_can_edit_game_result(game, current_user)
+    old_snapshot = build_game_snapshot(game)
+    if game.play_status == GamePlayStatus.SCHEDULED:
+        freeze_game_format(db, game, frozen_by_user_id=current_user.id)
     validation = validate_game_result_payload(game, payload, submit_mode=False)
     if validation.errors:
         _raise_validation_error("Draft validation failed.", validation)
 
-    old_snapshot = build_game_snapshot(game)
     reconcile_game_result_rows(db, game, payload, current_user)
     state_changed = False
     if game.play_status == GamePlayStatus.SCHEDULED:
