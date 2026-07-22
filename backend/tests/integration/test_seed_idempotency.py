@@ -6,11 +6,15 @@ from sqlalchemy.orm import Session
 
 from app.core.enums import GamePlayStatus, GameResultStatus
 from app.models.game import Game
+from app.models.game_event import GameEvent
 from app.models.game_participant import GameParticipant
 from app.models.game_player import GamePlayer
 from app.models.game_format_role_snapshot import GameFormatRoleSnapshot
 from app.models.game_format_snapshot import GameFormatSnapshot
+from app.models.user import User
+from app.schemas.game_event import GameEventCreate
 from app.scripts.seed import main as seed_main
+from app.services.game_event import append_game_event
 
 
 pytestmark = pytest.mark.integration
@@ -53,8 +57,43 @@ def test_seed_is_idempotent_and_writes_valid_dual_states(db_session: Session) ->
         )
     )
 
+    event_game = db_session.scalar(
+        select(Game).where(
+            Game.play_status == GamePlayStatus.IN_PROGRESS,
+            Game.result_status == GameResultStatus.DRAFT,
+        )
+    )
+    assert event_game is not None and event_game.judge_user_id is not None
+    judge = db_session.get(User, event_game.judge_user_id)
+    assert judge is not None
+    manual_event = append_game_event(
+        db_session,
+        event_game.id,
+        GameEventCreate.model_validate(
+            {
+                "phase": "night",
+                "round_no": 1,
+                "event_type": "phase_started",
+                "payload": {},
+                "client_event_id": "seed-preservation-check",
+            }
+        ),
+        judge,
+    )
+    event_id = manual_event.id
+    event_game_id = event_game.id
+    next_sequence = db_session.get(Game, event_game_id).next_event_sequence
+
     seed_main()
     db_session.expire_all()
+    preserved_event = db_session.get(GameEvent, event_id)
+    assert preserved_event is not None
+    assert preserved_event.client_event_id == "seed-preservation-check"
+    assert db_session.get(Game, event_game_id).next_event_sequence == next_sequence == 2
+    assert all(
+        game.next_event_sequence == 1
+        for game in db_session.scalars(select(Game).where(Game.id != event_game_id))
+    )
     assert list(
         db_session.execute(
             select(GameParticipant.id, GameParticipant.game_id, GameParticipant.user_id)
