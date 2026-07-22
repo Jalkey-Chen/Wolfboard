@@ -12,4 +12,4 @@ def test_database_is_postgresql_at_alembic_head(db_session: Session) -> None:
 
     assert database_version is not None
     assert database_version.startswith("PostgreSQL")
-    assert alembic_revision == "20260722_0009"
+    assert alembic_revision == "20260722_0010"
