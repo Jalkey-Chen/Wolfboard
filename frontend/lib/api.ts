@@ -20,6 +20,7 @@ export type CheckInStatus = "not_checked_in" | "checked_in" | "absent";
 export type RegistrationType = "main" | "substitute" | "guest";
 export type FormatCategory = "standard" | "special" | "fun";
 export type FormatRoleFaction = "good" | "wolf" | "third_party" | "special";
+export type FormatSnapshotOrigin = "runtime_freeze" | "legacy_backfill";
 export type GameType = "official" | "fun" | "practice";
 export type GamePlayerFaction = "good" | "wolf" | "third_party";
 export type GamePlayerFinalStatus = "alive" | "eliminated" | "unknown";
@@ -166,6 +167,35 @@ export type GameSummary = {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  has_format_snapshot: boolean;
+  format_snapshot_id: number | null;
+};
+
+export type GameFormatContextRole = {
+  id: number | null;
+  source_format_role_id: number | null;
+  role_name: string;
+  faction: FormatRoleFaction;
+  role_count: number;
+  display_order: number;
+  metadata_json: Record<string, unknown> | null;
+};
+
+export type GameFormatContext = {
+  is_frozen: boolean;
+  source_format_id: number | null;
+  snapshot_id: number | null;
+  snapshot_origin: FormatSnapshotOrigin | null;
+  snapshot_schema_version: number | null;
+  format_key: string;
+  format_name: string;
+  player_count: number;
+  category: FormatCategory;
+  description: string | null;
+  is_system_preset: boolean;
+  frozen_at: string | null;
+  frozen_by_user_id: number | null;
+  roles: GameFormatContextRole[];
 };
 
 export type GameDetail = GameSummary & {
@@ -267,7 +297,8 @@ export type GameResultDraftResponse = {
   game: GameDetail;
   players: GameResultPlayerRecord[];
   adjustments: GameResultAdjustmentRecord[];
-  format_roles: FormatRoleRecord[];
+  format_context: GameFormatContext;
+  format_roles: GameFormatContextRole[];
   selectable_players: SelectablePlayerRecord[];
   validation: ValidationSummary;
   editable: boolean;
@@ -597,6 +628,11 @@ export function createGame(token: string, payload: GameCreatePayload): Promise<G
 
 export function getGame(token: string, gameId: number): Promise<GameDetail> {
   return request<GameDetail>(`/games/${gameId}`, withAuth(token));
+}
+
+
+export function getGameFormatContext(token: string, gameId: number): Promise<GameFormatContext> {
+  return request<GameFormatContext>(`/games/${gameId}/format-context`, withAuth(token));
 }
 
 

@@ -7,7 +7,7 @@
  */
 
 import type {
-  FormatRoleRecord,
+  GameFormatContextRole,
   GamePlayerFaction,
   GamePlayerFinalStatus,
   ScoreAdjustmentType,
@@ -73,7 +73,7 @@ export function buildAdjustmentTotals(
 export function buildDraftValidation(params: {
   players: EditableGameResultPlayer[];
   adjustments: EditableGameResultAdjustment[];
-  formatRoles: FormatRoleRecord[];
+  formatRoles: GameFormatContextRole[];
   formatPlayerCount: number;
   judgeUserId: number;
 }): ValidationSummary {
