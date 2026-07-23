@@ -436,6 +436,161 @@ export type GameEventDefinition = {
   payload_field_semantics: Record<string, GameEventPayloadFieldSemantic>;
 };
 
+export type ProjectionIssueSeverity = "info" | "warning";
+
+export type GameProjectionIssue = {
+  code: string;
+  severity: ProjectionIssueSeverity;
+  message_key: string;
+  event_ids: number[];
+  participant_ids: number[];
+  round_no: number | null;
+  phase: GameEventPhase | null;
+  details: Record<string, unknown>;
+};
+
+export type GameDerivedPhaseState = {
+  current_phase: GameEventPhase | null;
+  current_round_no: number | null;
+  phase_is_open: boolean;
+  phase_started_event_id: number | null;
+  last_completed_phase: GameEventPhase | null;
+  last_completed_round_no: number | null;
+  last_completed_event_id: number | null;
+  last_observed_phase: GameEventPhase | null;
+  last_observed_round_no: number | null;
+  last_observed_event_id: number | null;
+};
+
+export type GameDerivedParticipantState = {
+  participant_id: number;
+  user_id: number | null;
+  seat_number: number | null;
+  display_name_snapshot: string | null;
+  recorded_role_name: string | null;
+  recorded_faction: GamePlayerFaction | null;
+  is_active_in_game: boolean;
+  has_exile_record: boolean;
+  has_death_record: boolean;
+  exile_event_ids: number[];
+  death_event_ids: number[];
+  exit_event_ids: number[];
+  first_exit_logical_sequence: number | null;
+  latest_exit_logical_sequence: number | null;
+};
+
+export type GameDerivedSheriffState = {
+  badge_status: "unassigned" | "held" | "destroyed";
+  current_sheriff_participant_id: number | null;
+  elected_event_id: number | null;
+  last_transfer_event_id: number | null;
+  destroyed_event_id: number | null;
+  current_candidate_participant_ids: number[];
+  withdrawn_participant_ids: number[];
+  declaration_provenance: Array<{ participant_id: number; event_ids: number[] }>;
+  withdrawal_provenance: Array<{ participant_id: number; event_ids: number[] }>;
+};
+
+export type GameDerivedVoteRecord = {
+  event_id: number;
+  voter_participant_id: number | null;
+  target_participant_id: number | null;
+  vote_weight: number;
+  logical_sequence_no: number;
+};
+
+export type GameDerivedTallyEntry = {
+  participant_id: number;
+  vote_weight: number;
+};
+
+export type GameDerivedBallotState = {
+  vote_kind: "sheriff" | "exile";
+  round_no: number;
+  ballot_no: number;
+  vote_event_ids: number[];
+  vote_records: GameDerivedVoteRecord[];
+  abstention_records: GameDerivedVoteRecord[];
+  voter_participant_ids: number[];
+  duplicate_voter_participant_ids: number[];
+  raw_tally: GameDerivedTallyEntry[];
+  computed_tally: GameDerivedTallyEntry[] | null;
+  tally_is_unambiguous: boolean;
+  explicit_tie_records: Array<{
+    event_id: number;
+    candidate_participant_ids: number[];
+  }>;
+  revote_records: Array<{
+    event_id: number;
+    eligible_participant_ids: number[];
+  }>;
+  explicit_outcome_event_ids: number[];
+};
+
+export type GameRecordedActionUsage = {
+  participant_id: number;
+  recorded_seer_check_count: number;
+  recorded_witch_antidote_count: number;
+  recorded_witch_poison_count: number;
+  recorded_guard_protection_count: number;
+  recorded_hunter_shot_count: number;
+  recorded_wolf_king_shot_count: number;
+  recorded_wolf_self_explosion_count: number;
+  recorded_sheriff_vote_count: number;
+  recorded_exile_vote_count: number;
+};
+
+export type GameRecordedActionSummary = {
+  event_type: string;
+  phase: GameEventPhase;
+  round_no: number;
+  actor_participant_id: number | null;
+  event_ids: number[];
+  recorded_count: number;
+  latest_recorded_target_participant_id: number | null;
+};
+
+export type GameDerivedRoundSummary = {
+  round_no: number;
+  phase: GameEventPhase;
+  event_count: number;
+  event_ids: number[];
+  phase_started_event_ids: number[];
+  phase_completed_event_ids: number[];
+  night_resolved_event_ids: number[];
+  event_type_counts: Array<{ event_type: string; count: number }>;
+};
+
+export type GameDerivedState = {
+  projection_version: 1;
+  projection_kind: "effective_event_projection";
+  game_id: number;
+  through_logical_sequence: number | null;
+  event_ledger_head_sequence: number;
+  effective_event_count: number;
+  last_applied_logical_sequence: number | null;
+  has_format_snapshot: boolean;
+  is_rule_engine_result: false;
+  format_snapshot_id: number | null;
+  format_key: string | null;
+  format_name: string | null;
+  snapshot_schema_version: number | null;
+  phase: GameDerivedPhaseState;
+  participants: GameDerivedParticipantState[];
+  sheriff: GameDerivedSheriffState;
+  ballots: GameDerivedBallotState[];
+  recorded_action_usage: GameRecordedActionUsage[];
+  recorded_actions: GameRecordedActionSummary[];
+  round_summaries: GameDerivedRoundSummary[];
+  night_resolutions: Array<{
+    event_id: number;
+    round_no: number;
+    no_public_death: boolean;
+    note: string | null;
+  }>;
+  issues: GameProjectionIssue[];
+};
+
 export type GameConfirmPayload = {
   comment?: string | null;
 };
@@ -897,6 +1052,22 @@ export function listGameEvents(
 
 export function listGameEventDefinitions(token: string): Promise<GameEventDefinition[]> {
   return request<GameEventDefinition[]>("/game-events/definitions", withAuth(token));
+}
+
+export function getGameDerivedState(
+  token: string,
+  gameId: number,
+  throughLogicalSequence?: number,
+): Promise<GameDerivedState> {
+  const params = new URLSearchParams();
+  if (throughLogicalSequence !== undefined) {
+    params.set("through_logical_sequence", String(throughLogicalSequence));
+  }
+  const query = params.size > 0 ? `?${params.toString()}` : "";
+  return request<GameDerivedState>(
+    `/games/${gameId}/derived-state${query}`,
+    withAuth(token),
+  );
 }
 
 

@@ -16,6 +16,7 @@ from app.schemas.game_event import (
     GameEventRead,
     GameEventVoid,
 )
+from app.schemas.game_state_projection import GameDerivedStateRead
 from app.services.game_event_registry import EVENT_DEFINITIONS, ReferencePolicy
 from app.core.enums import GameEventPhase, GameEventSource
 from app.services.game_event import (
@@ -26,6 +27,7 @@ from app.services.game_event import (
     read_game_event,
     void_game_event,
 )
+from app.services.game_state_service import get_game_derived_state
 
 
 router = APIRouter(tags=["game-events"])
@@ -85,6 +87,24 @@ def list_game_event_definitions(
             detail="The admin or judge role is required to read event definitions.",
         )
     return build_event_definition_reads()
+
+
+@router.get("/games/{game_id}/derived-state", response_model=GameDerivedStateRead)
+def read_game_derived_state(
+    game_id: int,
+    through_logical_sequence: int | None = Query(default=None, ge=1),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> GameDerivedStateRead:
+    """Project recorded state from the current effective event timeline."""
+
+    projected = get_game_derived_state(
+        db,
+        game_id,
+        current_user,
+        through_logical_sequence=through_logical_sequence,
+    )
+    return GameDerivedStateRead.model_validate(projected)
 
 
 @router.post("/games/{game_id}/events", response_model=GameEventRead)

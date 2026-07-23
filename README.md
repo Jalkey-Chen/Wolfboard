@@ -294,6 +294,9 @@ password123
 ### 结构化对局事件账本
 
 - `GameEvent` 记录局内动作与结算事实，不重复 Game 生命周期、赛果审核、积分或状态历史；普通追加不重复写 AuditLog，纠正和作废会写审计。
+- `GET /api/v1/games/{game_id}/derived-state` 将当前 effective timeline 确定性投影为显式阶段、出局记录、警长、票型、已记录动作次数和一致性提示。它是只读记录状态，不是自动裁判或规则引擎结论。
+- 可选 `through_logical_sequence` 只读取“当前有效时间线”的逻辑前缀；它不能恢复纠正或作废发生前的历史 as-of 视角。
+- 纯投影器不访问数据库、不读取当前时间、不写事件或 Game，并以 `projection_version = 1` 固定当前语义。架构边界详见 `docs/architecture/game-state-projection.md`。
 - `sequence_no` 是不可变账本顺序，`logical_sequence_no` 是有效时间线位置。纠正会追加新版本并继承逻辑位置，原版本保留为 `superseded`；作废保留原文并标记 `voided`。
 - Game 行锁与 `next_event_sequence` 串行分配序号；`client_event_id` 提供局内幂等，数据库 partial unique index 保证每个逻辑位置最多一个 active 版本。
 - 事件 actor/target 使用稳定 `GameParticipant`，并依赖冻结版型快照。participant 一旦被任意事件引用，当前草稿流程不再允许删除或修改其 user/seat。
@@ -387,6 +390,7 @@ password123
 ### 对局事件
 
 - `GET /api/v1/game-events/definitions`
+- `GET /api/v1/games/{game_id}/derived-state`
 - `GET /api/v1/games/{game_id}/events`
 - `GET /api/v1/games/{game_id}/events/{event_id}`
 - `POST /api/v1/games/{game_id}/events`
@@ -464,9 +468,9 @@ M6.0C 已将最后一条 strict xfail（重复保存草稿导致 `GamePlayer.id`
 
 当前已提供 `/judge/games/{game_id}/events` 主持人事件工作台。工作台从服务器 definitions 注册表读取权威事件约束，支持 22 种 V1 事件、有效时间线、完整账本、纠正、作废，以及基于 `client_event_id` 的安全重试。本地未提交表单仅保存在版本化的 `localStorage` 记录中，不包含令牌或完整 Game 数据。
 
-当前仍未实现：
+当前已实现后端的确定性只读状态投影，但尚未把它展示在事件工作台。仍未实现：
 
-- 事件状态重放与公开/完整复盘 projection
+- 工作台状态面板与公开/完整复盘 projection
 - 自动裁判 / 自动胜负推导
 - 复盘回放系统
 - 复杂规则引擎
