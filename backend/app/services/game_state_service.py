@@ -59,6 +59,10 @@ def get_game_derived_state(
             GameEvent.logical_sequence_no <= through_logical_sequence
         )
     event_rows = list(db.scalars(event_statement))
+    observed_ledger_head = max(
+        game.next_event_sequence - 1,
+        max((event.sequence_no for event in event_rows), default=0),
+    )
 
     snapshot = game.format_snapshot
     context = GameProjectionContext(
@@ -71,7 +75,7 @@ def get_game_derived_state(
         snapshot_schema_version=snapshot.snapshot_schema_version if snapshot else None,
         snapshot_player_count=snapshot.player_count if snapshot else None,
         snapshot_role_names=tuple(role.role_name for role in snapshot.roles) if snapshot else (),
-        event_ledger_head_sequence=game.next_event_sequence - 1,
+        event_ledger_head_sequence=observed_ledger_head,
         started_at=game.started_at,
         ended_at=game.ended_at,
     )

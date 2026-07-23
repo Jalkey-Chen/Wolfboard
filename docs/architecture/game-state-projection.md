@@ -148,8 +148,10 @@ The service uses fixed eager-loading queries and loads active events only. It
 does not acquire `FOR UPDATE`, change `next_event_sequence`, or touch
 `updated_at`. Under PostgreSQL's normal transaction behavior, a concurrent
 append or correction may become visible between separate reads.
-`event_ledger_head_sequence` is the Game's allocated ledger head observed by
-the request; it is diagnostic metadata, not a strong ETag or materialized-state
+`event_ledger_head_sequence` is the greater of the observed Game counter and
+the maximum sequence among active events loaded by this request. This prevents
+the reported head from falling behind an event included in the response, but
+it remains diagnostic metadata rather than a strong ETag or materialized-state
 revision.
 
 ## Snapshot Boundary And Deferred Rules
