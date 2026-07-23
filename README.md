@@ -297,6 +297,8 @@ password123
 - `GET /api/v1/games/{game_id}/derived-state` 将当前 effective timeline 确定性投影为显式阶段、出局记录、警长、票型、已记录动作次数和一致性提示。它是只读记录状态，不是自动裁判或规则引擎结论。
 - 可选 `through_logical_sequence` 只读取“当前有效时间线”的逻辑前缀；它不能恢复纠正或作废发生前的历史 as-of 视角。
 - 纯投影器不访问数据库、不读取当前时间、不写事件或 Game，并以 `projection_version = 1` 固定当前语义。架构边界详见 `docs/architecture/game-state-projection.md`。
+- 主持人事件工作台提供“推导状态”视图，展示显式阶段、参与者出局记录、警长记录、票型、已记录动作次数、轮次摘要和投影提示；前端只负责排序、分组和本地化，不在浏览器中重新实现 reducer。
+- 有效时间线中的事件可打开“截止此逻辑位置”的当前有效前缀。该视图在事件纠正、作废或追加后保持所选逻辑位置并重新请求，且不会伪装为过去某一账本时刻的历史快照。详见 `docs/architecture/derived-state-panel.md`。
 - `sequence_no` 是不可变账本顺序，`logical_sequence_no` 是有效时间线位置。纠正会追加新版本并继承逻辑位置，原版本保留为 `superseded`；作废保留原文并标记 `voided`。
 - Game 行锁与 `next_event_sequence` 串行分配序号；`client_event_id` 提供局内幂等，数据库 partial unique index 保证每个逻辑位置最多一个 active 版本。
 - 事件 actor/target 使用稳定 `GameParticipant`，并依赖冻结版型快照。participant 一旦被任意事件引用，当前草稿流程不再允许删除或修改其 user/seat。
@@ -468,11 +470,11 @@ M6.0C 已将最后一条 strict xfail（重复保存草稿导致 `GamePlayer.id`
 
 当前已提供 `/judge/games/{game_id}/events` 主持人事件工作台。工作台从服务器 definitions 注册表读取权威事件约束，支持 22 种 V1 事件、有效时间线、完整账本、纠正、作废，以及基于 `client_event_id` 的安全重试。本地未提交表单仅保存在版本化的 `localStorage` 记录中，不包含令牌或完整 Game 数据。
 
-当前已实现后端的确定性只读状态投影，但尚未把它展示在事件工作台。仍未实现：
+当前工作台已接入后端确定性只读状态投影，可查看最新有效状态或有效时间线的逻辑前缀，并从推导结果定位原始事件。仍未实现：
 
-- 工作台状态面板与公开/完整复盘 projection
+- 面向普通玩家或公众的可见性 projection 与复盘页面
 - 自动裁判 / 自动胜负推导
-- 复盘回放系统
+- 历史账本 as-of 回放
 - 复杂规则引擎
 
 这些能力会在后续 Milestone 中继续推进。

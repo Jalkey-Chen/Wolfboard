@@ -162,7 +162,8 @@ participant held a role or whether an action was legal. Participant count and
 recorded-role mismatches become issues rather than adjudication errors.
 
 M6.3A does not persist checkpoints, write system events, infer resource
-consumption, validate role powers, calculate deaths, or decide victory. M6.3B
-will display this read-only state in the judge workbench. Future rules engines
-must consume the fact ledger and deterministic projection without rewriting
-GameEvent history.
+consumption, validate role powers, calculate deaths, or decide victory. The
+M6.3B judge workbench displays this response without duplicating the reducer
+in the browser; see `derived-state-panel.md`. Future rules engines must consume
+the fact ledger and deterministic projection without rewriting GameEvent
+history.

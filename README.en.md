@@ -301,6 +301,8 @@ That means:
 - `GET /api/v1/games/{game_id}/derived-state` deterministically projects the current effective timeline into explicit phase, exit records, sheriff state, ballots, recorded action counts, and consistency issues. It is read-only recorded state, not an automated ruling or rules-engine result.
 - Optional `through_logical_sequence` reads a logical prefix of the current effective timeline. It cannot reconstruct the historical as-of view before correction or voiding.
 - The pure projector neither accesses the database nor reads the clock, writes events, or changes Game. `projection_version = 1` fixes the current semantics; see `docs/architecture/game-state-projection.md`.
+- The judge event workbench includes a Derived State view for explicit phases, participant exit records, sheriff records, ballots, recorded action counts, round summaries, and projection issues. The browser only sorts, groups, and localizes the response; it does not implement a second reducer.
+- An effective-timeline event can open the current effective prefix through that logical position. Event append, correction, or void refreshes the selected prefix without presenting it as a historical ledger snapshot. See `docs/architecture/derived-state-panel.md`.
 - `sequence_no` is immutable ledger order and `logical_sequence_no` is effective timeline position. Correction appends a replacement at the same logical position and retains the old version as `superseded`; void retains the original body as `voided`.
 - A Game row lock and `next_event_sequence` serialize allocation. `client_event_id` provides per-game retry idempotency, and a partial unique index permits at most one active version per logical position.
 - Event actors and targets use stable `GameParticipant` rows and require frozen format context. Once any event references a participant, result drafts cannot delete it or change its user/seat binding.
@@ -472,11 +474,11 @@ M6.0C converts the final strict xfail (a repeated draft save changing `GamePlaye
 
 The judge event workbench is available at `/judge/games/{game_id}/events`. It consumes authoritative constraints from the server definitions registry and supports all 22 V1 events, effective and ledger views, correction, voiding, and safe `client_event_id` retries. Versioned local drafts contain neither authentication tokens nor a complete Game object.
 
-The deterministic read-only backend projection is now available, but it is not yet displayed in the event workbench. Still deferred:
+The workbench now displays the deterministic read-only backend projection, supports latest and logical-prefix modes, and can locate provenance events from projected state. Still deferred:
 
-- the workbench state panel and public/full replay projections
+- visibility-aware player/public projections and replay pages
 - automatic adjudication
-- replay tooling
+- historical ledger as-of replay
 - complex rules engine
 
 These will be addressed in later milestones.
