@@ -17,6 +17,7 @@ type LedgerProps = {
   onLoadMore: () => void;
   onCorrect: (event: GameEventRecord) => void;
   onVoid: (event: GameEventRecord) => void;
+  highlightedEventId?: number | null;
 };
 
 function referencesParticipant(event: GameEventRecord, participantId: number): boolean {
@@ -67,7 +68,7 @@ export function EventLedger(props: LedgerProps) {
         <input aria-label={t("eventWorkbench.round")} className="rounded-md border border-slate-300 px-2 py-2 text-sm" min={1} onChange={(event) => setRound(event.target.value)} placeholder={t("eventWorkbench.round")} type="number" value={round} />
       </div>
       <div className="mt-4 space-y-2">
-        {filtered.map((event) => <EventCard editable={props.editable} event={event} key={event.id} ledger onCorrect={props.onCorrect} onVoid={props.onVoid} participants={props.participants} />)}
+        {filtered.map((event) => <EventCard editable={props.editable} event={event} highlighted={props.highlightedEventId === event.id} key={event.id} ledger onCorrect={props.onCorrect} onVoid={props.onVoid} participants={props.participants} />)}
         {filtered.length === 0 ? <div className="border border-dashed border-slate-300 p-6 text-sm text-slate-600">{t("common.noData")}</div> : null}
       </div>
       {props.hasMore ? <button className="mt-4 w-full rounded-md border border-slate-300 px-4 py-3 text-sm font-semibold" disabled={props.loadingMore} onClick={props.onLoadMore} type="button">{props.loadingMore ? t("common.loading") : t("eventWorkbench.loadMore")}</button> : null}

@@ -15,9 +15,20 @@ type EventCardProps = {
   editable: boolean;
   onCorrect: (event: GameEventRecord) => void;
   onVoid: (event: GameEventRecord) => void;
+  onInspectState?: (event: GameEventRecord) => void;
+  highlighted?: boolean;
 };
 
-export function EventCard({ event, participants, ledger, editable, onCorrect, onVoid }: EventCardProps) {
+export function EventCard({
+  event,
+  participants,
+  ledger,
+  editable,
+  onCorrect,
+  onVoid,
+  onInspectState,
+  highlighted,
+}: EventCardProps) {
   const { t, enumLabel } = useI18n();
   const participantMap = new Map(participants.map((item) => [item.participantId, participantDisplay(item)]));
   const statusClass = event.status === "active"
@@ -31,7 +42,11 @@ export function EventCard({ event, participants, ledger, editable, onCorrect, on
   });
 
   return (
-    <article className={`rounded-lg border bg-white p-4 ${event.status === "active" ? "border-slate-200" : "border-slate-300"}`} id={`event-${event.id}`}>
+    <article
+      className={`rounded-lg border bg-white p-4 focus:outline-none focus:ring-2 focus:ring-sky-500 ${event.status === "active" ? "border-slate-200" : "border-slate-300"} ${highlighted ? "ring-2 ring-sky-500" : ""}`}
+      id={`event-${event.id}`}
+      tabIndex={-1}
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
@@ -44,12 +59,17 @@ export function EventCard({ event, participants, ledger, editable, onCorrect, on
           <h3 className="mt-2 text-base font-bold text-slate-900">{summary}</h3>
           <p className="mt-2 break-words text-xs text-slate-600">{compactPayload(event.payload)}</p>
         </div>
-        {editable && event.status === "active" ? (
-          <div className="flex shrink-0 gap-2">
-            <button className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => onCorrect(event)} type="button">{t("eventWorkbench.correct")}</button>
-            <button className="rounded-md border border-red-300 px-3 py-2 text-sm font-semibold text-red-800 hover:bg-red-50" onClick={() => onVoid(event)} type="button">{t("eventWorkbench.void")}</button>
-          </div>
-        ) : null}
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {!ledger && event.status === "active" && onInspectState ? (
+            <button className="rounded-md border border-sky-300 px-3 py-2 text-sm font-semibold text-sky-900 hover:bg-sky-50" onClick={() => onInspectState(event)} type="button">{t("derivedState.inspectAfterEvent")}</button>
+          ) : null}
+          {editable && event.status === "active" ? (
+            <>
+              <button className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => onCorrect(event)} type="button">{t("eventWorkbench.correct")}</button>
+              <button className="rounded-md border border-red-300 px-3 py-2 text-sm font-semibold text-red-800 hover:bg-red-50" onClick={() => onVoid(event)} type="button">{t("eventWorkbench.void")}</button>
+            </>
+          ) : null}
+        </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-100 pt-3 text-xs text-slate-500">
         <span>{event.created_by.display_name} · {formatDateTime(event.created_at)}</span>
