@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CorrectEventDialog } from "@/components/game-events/CorrectEventDialog";
+import { DerivedStatePanel } from "@/components/game-state/DerivedStatePanel";
 import { EffectiveTimeline } from "@/components/game-events/EffectiveTimeline";
 import { EventLedger } from "@/components/game-events/EventLedger";
 import { GameEventComposer } from "@/components/game-events/GameEventComposer";
@@ -17,6 +18,7 @@ import {
   createGameEvent,
   endGame,
   getGame,
+  getGameEvent,
   getGameFormatContext,
   getGameResultDraft,
   listGameEventDefinitions,
@@ -36,6 +38,7 @@ import { eventDraftStorageKey } from "@/lib/game-events/draft-storage";
 import { parseWorkbenchError } from "@/lib/game-events/errors";
 import type { ParticipantOption } from "@/lib/game-events/form-types";
 import { resolveWorkbenchMode } from "@/lib/game-events/lifecycle";
+import { useDerivedState } from "@/lib/game-state/use-derived-state";
 
 
 const PAGE_SIZE = 100;
@@ -57,6 +60,9 @@ type WorkbenchData = {
   ledger: GameEventRecord[];
 };
 
+type ViewerTab = "effective" | "ledger" | "derived";
+type MobileView = "compose" | ViewerTab;
+
 export function EventWorkbench({
   gameId,
   token,
@@ -73,12 +79,18 @@ export function EventWorkbench({
   const [loadingMore, setLoadingMore] = useState(false);
   const [effectiveHasMore, setEffectiveHasMore] = useState(false);
   const [ledgerHasMore, setLedgerHasMore] = useState(false);
-  const [tab, setTab] = useState<"effective" | "ledger">("effective");
+  const [viewerTab, setViewerTab] = useState<ViewerTab>("effective");
+  const [mobileView, setMobileView] = useState<MobileView>("compose");
   const [correcting, setCorrecting] = useState<GameEventRecord | null>(null);
   const [voiding, setVoiding] = useState<GameEventRecord | null>(null);
   const [voidBusy, setVoidBusy] = useState(false);
   const [voidError, setVoidError] = useState<string | null>(null);
   const [otherTabNotice, setOtherTabNotice] = useState(false);
+  const [highlightedEventId, setHighlightedEventId] = useState<number | null>(null);
+  const derived = useDerivedState({ gameId, token });
+  const refreshDerived = derived.refresh;
+  const derivedSelection = derived.selection;
+  const markDerivedStale = derived.markStale;
 
   const loadAll = useCallback(async () => {
     const [game, format, draft, definitions, effective, ledger] = await Promise.all([
@@ -100,7 +112,7 @@ export function EventWorkbench({
     void loadAll().catch((loadError) => setError(parseWorkbenchError(loadError).message));
   }, [loadAll]);
 
-  const refreshEvents = useCallback(async () => {
+  const refreshEvents = useCallback(async (options: { ledgerUpdated?: boolean } = {}) => {
     setRefreshing(true);
     try {
       const [game, effective, ledger] = await Promise.all([
@@ -112,17 +124,27 @@ export function EventWorkbench({
       setEffectiveHasMore(effective.length === PAGE_SIZE);
       setLedgerHasMore(ledger.length === PAGE_SIZE);
       setOtherTabNotice(false);
+      const selectedEvent = derivedSelection
+        ? effective.find((event) => event.logical_sequence_no === derivedSelection.logicalSequence) ?? null
+        : undefined;
+      await refreshDerived({
+        ledgerUpdated: options.ledgerUpdated,
+        selectedEvent,
+      });
     } catch (refreshError) {
       setError(parseWorkbenchError(refreshError).message);
     } finally {
       setRefreshing(false);
     }
-  }, [gameId, token]);
+  }, [derivedSelection, gameId, refreshDerived, token]);
 
   useEffect(() => {
     function onFocus() { void refreshEvents(); }
     function onStorage(storageEvent: StorageEvent) {
-      if (storageEvent.key === eventDraftStorageKey(gameId)) setOtherTabNotice(true);
+      if (storageEvent.key === eventDraftStorageKey(gameId)) {
+        setOtherTabNotice(true);
+        markDerivedStale();
+      }
     }
     window.addEventListener("focus", onFocus);
     window.addEventListener("storage", onStorage);
@@ -130,7 +152,7 @@ export function EventWorkbench({
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("storage", onStorage);
     };
-  }, [gameId, refreshEvents]);
+  }, [gameId, markDerivedStale, refreshEvents]);
 
   const participants = useMemo<ParticipantOption[]>(() => (data?.draft.players ?? []).map((player) => ({
     participantId: player.participant_id,
@@ -152,7 +174,7 @@ export function EventWorkbench({
   const recentEvent = data.effective.at(-1);
 
   async function refreshAfterWrite() {
-    await refreshEvents();
+    await refreshEvents({ ledgerUpdated: true });
   }
 
   async function loadMore(view: "effective" | "ledger") {
@@ -184,6 +206,7 @@ export function EventWorkbench({
       if (action === "start") await startGame(token, gameId);
       else await endGame(token, gameId);
       await loadAll();
+      await derived.refresh();
     } catch (stateError) {
       setError(parseWorkbenchError(stateError).message);
     } finally {
@@ -206,6 +229,47 @@ export function EventWorkbench({
     } finally {
       setVoidBusy(false);
     }
+  }
+
+  function inspectStateAfter(event: GameEventRecord) {
+    setViewerTab("derived");
+    setMobileView("derived");
+    void derived.inspectEvent(event);
+  }
+
+  async function openProvenanceEvent(eventId: number) {
+    let target = loadedData.effective.find((event) => event.id === eventId)
+      ?? loadedData.ledger.find((event) => event.id === eventId);
+    if (!target) {
+      try {
+        target = await getGameEvent(token, gameId, eventId);
+        const fetched = target;
+        setData((current) => current ? {
+          ...current,
+          ledger: current.ledger.some((event) => event.id === fetched.id)
+            ? current.ledger
+            : [...current.ledger, fetched].sort((left, right) => left.sequence_no - right.sequence_no),
+          effective: fetched.status === "active" && !current.effective.some((event) => event.id === fetched.id)
+            ? [...current.effective, fetched].sort((left, right) =>
+                left.logical_sequence_no - right.logical_sequence_no || left.id - right.id,
+              )
+            : current.effective,
+        } : current);
+      } catch (eventError) {
+        setError(parseWorkbenchError(eventError).message);
+        return;
+      }
+    }
+    const targetTab: ViewerTab = target.status === "active" ? "effective" : "ledger";
+    setViewerTab(targetTab);
+    setMobileView(targetTab);
+    setHighlightedEventId(eventId);
+    window.setTimeout(() => {
+      const element = document.getElementById(`event-${eventId}`);
+      element?.focus({ preventScroll: true });
+      element?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    }, 0);
+    window.setTimeout(() => setHighlightedEventId((current) => current === eventId ? null : current), 2400);
   }
 
   return (
@@ -252,8 +316,31 @@ export function EventWorkbench({
           </div>
         ) : null}
 
+        <div className="grid grid-cols-4 gap-1 rounded-md border border-slate-300 bg-white p-1 lg:hidden" role="tablist">
+          {([
+            ["compose", t("eventWorkbench.mobile.compose")],
+            ["effective", t("eventWorkbench.mobile.timeline")],
+            ["ledger", t("eventWorkbench.mobile.ledger")],
+            ["derived", t("eventWorkbench.mobile.derived")],
+          ] as Array<[MobileView, string]>).map(([value, label]) => (
+            <button
+              aria-selected={mobileView === value}
+              className={`min-w-0 rounded px-1 py-2 text-xs font-bold ${mobileView === value ? "bg-slate-900 text-white" : "text-slate-700"}`}
+              key={value}
+              onClick={() => {
+                setMobileView(value);
+                if (value !== "compose") setViewerTab(value);
+              }}
+              role="tab"
+              type="button"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(320px,0.85fr)_minmax(0,1.5fr)] lg:items-start">
-          <section className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-4">
+          <section className={`${mobileView === "compose" ? "block" : "hidden"} min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-4 lg:block`}>
             <h2 className="text-lg font-bold text-slate-900">{t("eventWorkbench.composer")}</h2>
             <div className="mt-4">
               <GameEventComposer
@@ -272,20 +359,19 @@ export function EventWorkbench({
             </div>
           </section>
 
-          <section className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <section className={`${mobileView === "compose" ? "hidden" : "block"} min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:block`}>
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
-              <div className="flex gap-1" role="tablist">
-                <button aria-selected={tab === "effective"} className={`rounded-md px-3 py-2 text-sm font-bold ${tab === "effective" ? "bg-slate-900 text-white" : "text-slate-600"}`} onClick={() => setTab("effective")} role="tab" type="button">{t("eventWorkbench.effectiveTimeline")}</button>
-                <button aria-selected={tab === "ledger"} className={`rounded-md px-3 py-2 text-sm font-bold ${tab === "ledger" ? "bg-slate-900 text-white" : "text-slate-600"}`} onClick={() => setTab("ledger")} role="tab" type="button">{t("eventWorkbench.fullLedger")}</button>
+              <div className="hidden gap-1 lg:flex" role="tablist">
+                <button aria-selected={viewerTab === "effective"} className={`rounded-md px-3 py-2 text-sm font-bold ${viewerTab === "effective" ? "bg-slate-900 text-white" : "text-slate-600"}`} onClick={() => setViewerTab("effective")} role="tab" type="button">{t("eventWorkbench.effectiveTimeline")}</button>
+                <button aria-selected={viewerTab === "ledger"} className={`rounded-md px-3 py-2 text-sm font-bold ${viewerTab === "ledger" ? "bg-slate-900 text-white" : "text-slate-600"}`} onClick={() => setViewerTab("ledger")} role="tab" type="button">{t("eventWorkbench.fullLedger")}</button>
+                <button aria-selected={viewerTab === "derived"} className={`rounded-md px-3 py-2 text-sm font-bold ${viewerTab === "derived" ? "bg-slate-900 text-white" : "text-slate-600"}`} onClick={() => setViewerTab("derived")} role="tab" type="button">{t("derivedState.tab")}</button>
               </div>
               <button className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" disabled={refreshing} onClick={() => void refreshEvents()} type="button">{refreshing ? t("common.loading") : t("eventWorkbench.refresh")}</button>
             </div>
             <div className="mt-4" role="tabpanel">
-              {tab === "effective" ? (
-                <EffectiveTimeline editable={editable} events={data.effective} hasMore={effectiveHasMore} loadingMore={loadingMore} onCorrect={setCorrecting} onLoadMore={() => void loadMore("effective")} onVoid={setVoiding} participants={participants} />
-              ) : (
-                <EventLedger editable={editable} events={data.ledger} hasMore={ledgerHasMore} loadingMore={loadingMore} onCorrect={setCorrecting} onLoadMore={() => void loadMore("ledger")} onVoid={setVoiding} participants={participants} />
-              )}
+              {viewerTab === "effective" ? <EffectiveTimeline editable={editable} events={data.effective} hasMore={effectiveHasMore} highlightedEventId={highlightedEventId} loadingMore={loadingMore} onCorrect={setCorrecting} onInspectState={inspectStateAfter} onLoadMore={() => void loadMore("effective")} onVoid={setVoiding} participants={participants} /> : null}
+              {viewerTab === "ledger" ? <EventLedger editable={editable} events={data.ledger} hasMore={ledgerHasMore} highlightedEventId={highlightedEventId} loadingMore={loadingMore} onCorrect={setCorrecting} onLoadMore={() => void loadMore("ledger")} onVoid={setVoiding} participants={participants} /> : null}
+              {viewerTab === "derived" ? <DerivedStatePanel controller={derived} ledgerLocked={!mode.editable} onOpenEvent={(eventId) => void openProvenanceEvent(eventId)} /> : null}
             </div>
           </section>
         </div>

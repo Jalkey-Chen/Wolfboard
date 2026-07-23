@@ -1058,6 +1058,7 @@ export function getGameDerivedState(
   token: string,
   gameId: number,
   throughLogicalSequence?: number,
+  signal?: AbortSignal,
 ): Promise<GameDerivedState> {
   const params = new URLSearchParams();
   if (throughLogicalSequence !== undefined) {
@@ -1066,7 +1067,7 @@ export function getGameDerivedState(
   const query = params.size > 0 ? `?${params.toString()}` : "";
   return request<GameDerivedState>(
     `/games/${gameId}/derived-state${query}`,
-    withAuth(token),
+    withAuth(token, { signal }),
   );
 }
 

@@ -4,7 +4,13 @@
 
 The private workbench at `/judge/games/{game_id}/events` lets an assigned judge or admin record and audit the 22 V1 `GameEvent` types from a phone, tablet, or desktop. It presents Game lifecycle, frozen format, participants, the effective timeline, and the append-only ledger in one operator surface.
 
-The workbench does not derive current game state. Phase and round are operator-entered values, initially prefilled from the most recent effective event. It does not infer living players, ability availability, phase order, vote outcomes, deaths, or winners. The backend remains authoritative for permissions, lifecycle gates, payload validation, same-Game references, idempotency, sequence allocation, correction, and voiding.
+The composer does not derive current game state. Phase and round are
+operator-entered values, initially prefilled from the most recent effective
+event. A separate read-only panel renders the M6.3A server projection. The
+browser does not infer living players, ability availability, phase order, vote
+outcomes, deaths, or winners. The backend remains authoritative for
+permissions, lifecycle gates, payload validation, same-Game references,
+idempotency, sequence allocation, correction, voiding, and projection.
 
 ## Server-Driven Definitions
 
@@ -36,6 +42,36 @@ The effective tab contains only active versions ordered by logical sequence and 
 
 The ledger tab contains active, superseded, and voided records in immutable ledger-sequence order. It shows logical sequence, client ID summary, creator, timestamps, supersession, and invalidation metadata. Status, event type, phase, round, and participant filters apply only to the records currently loaded; the UI states this scope and offers pagination rather than implying a global filtered result.
 
+## Derived State Panel
+
+The third workbench view calls
+`GET /api/v1/games/{game_id}/derived-state`; it never runs a client-side
+reducer. It displays explicit phase records, participant exit records, sheriff
+records, backend-provided ballot calculations, recorded action counts, round
+summaries, and projection issues. Its heading and explanatory copy identify
+the result as a deterministic projection of effective events, not an
+automated ruling.
+
+An action on each effective event requests
+`through_logical_sequence=<logical_sequence_no>` and switches to the panel.
+This is the prefix of the current effective timeline. Corrected events use
+their active replacement and voided events remain absent, so the mode is not a
+historical as-of replay. Returning to latest removes the prefix parameter.
+Rapid changes abort stale requests, and an older response cannot overwrite a
+new selection.
+
+Provenance controls locate event IDs referenced by phase, participant,
+sheriff, ballot, round, or issue data. If the event is outside the loaded
+page, the workbench fetches it with the event-detail endpoint before focusing
+and highlighting its card. A locked Game remains readable because projection
+permissions are independent from ledger mutation gates.
+
+Projection failures are isolated from composer and ledger loading. Append,
+correction, void, start, end, focus refresh, and manual refresh invalidate the
+panel. Prefix mode remains selected after a ledger mutation and clearly warns
+that the ledger changed. Cross-tab storage activity marks the panel as
+possibly stale rather than merging local drafts.
+
 ## Correction And Void
 
 Correction reuses the composer in a focused dialog, prefills the active event body, keeps logical sequence read-only, requires a reason, and submits a new client ID. On success both views refresh and expose the old/new version relationship. A concurrent `409` does not overwrite the winner and refreshes the ledger.
@@ -63,4 +99,7 @@ The surface is single-column with large touch targets and a sticky save action o
 
 Vitest, React Testing Library, and jsdom cover request normalization, stable fingerprints, local draft round-trips, registry drift, formatter output, field validation, pending retry identity, correction/void dialogs, participant-empty mode, lifecycle locking, and tab switching. `npm run test` is part of the frontend CI quality gate.
 
-M6.3 will add replay reducers and derived current state. M6.4 will add visibility-aware public and full replay projections. Multi-device live synchronization, polling, WebSocket/SSE, automatic rules, and confirmed-result event correction remain deferred.
+M6.4 will add visibility-aware public and full replay projections.
+Multi-device live synchronization, polling, WebSocket/SSE, automatic rules,
+historical as-of replay, and confirmed-result event correction remain
+deferred.

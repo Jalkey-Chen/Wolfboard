@@ -15,6 +15,8 @@ type TimelineProps = {
   onLoadMore: () => void;
   onCorrect: (event: GameEventRecord) => void;
   onVoid: (event: GameEventRecord) => void;
+  onInspectState: (event: GameEventRecord) => void;
+  highlightedEventId?: number | null;
 };
 
 export function EffectiveTimeline(props: TimelineProps) {
@@ -36,7 +38,7 @@ export function EffectiveTimeline(props: TimelineProps) {
             {t("eventWorkbench.roundLabel", { round: group.round })} · {enumLabel("gameEventPhase", group.phase)}
           </h3>
           <div className="space-y-2">
-            {group.events.map((event) => <EventCard editable={props.editable} event={event} key={event.id} onCorrect={props.onCorrect} onVoid={props.onVoid} participants={props.participants} />)}
+            {group.events.map((event) => <EventCard editable={props.editable} event={event} highlighted={props.highlightedEventId === event.id} key={event.id} onCorrect={props.onCorrect} onInspectState={props.onInspectState} onVoid={props.onVoid} participants={props.participants} />)}
           </div>
         </section>
       ))}
