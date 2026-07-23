@@ -386,6 +386,7 @@ password123
 
 ### 对局事件
 
+- `GET /api/v1/game-events/definitions`
 - `GET /api/v1/games/{game_id}/events`
 - `GET /api/v1/games/{game_id}/events/{event_id}`
 - `POST /api/v1/games/{game_id}/events`
@@ -417,6 +418,7 @@ cd frontend
 npm ci
 npm run lint
 npx tsc --noEmit
+npm run test
 npm run build
 ```
 
@@ -450,7 +452,7 @@ uv run pytest -q
 
 `.github/workflows/quality.yml` 在 push 和 pull request 上并行运行：
 
-- Frontend：`npm ci`、ESLint、TypeScript 检查、production build。
+- Frontend：`npm ci`、ESLint、TypeScript 检查、Vitest、production build。
 - Backend：`uv sync --frozen --dev`、CI PostgreSQL service、`alembic upgrade head`、`pytest -q`。
 - CI 不运行 seed，也不需要真实 secrets。
 
@@ -460,9 +462,10 @@ M6.0C 已将最后一条 strict xfail（重复保存草稿导致 `GamePlayer.id`
 
 ## 当前未实现内容
 
+当前已提供 `/judge/games/{game_id}/events` 主持人事件工作台。工作台从服务器 definitions 注册表读取权威事件约束，支持 22 种 V1 事件、有效时间线、完整账本、纠正、作废，以及基于 `client_event_id` 的安全重试。本地未提交表单仅保存在版本化的 `localStorage` 记录中，不包含令牌或完整 Game 数据。
+
 当前仍未实现：
 
-- 主持人事件录入页面
 - 事件状态重放与公开/完整复盘 projection
 - 自动裁判 / 自动胜负推导
 - 复盘回放系统

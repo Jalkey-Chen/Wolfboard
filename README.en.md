@@ -390,6 +390,7 @@ This is only a compact list of key routes:
 
 ### Game events
 
+- `GET /api/v1/game-events/definitions`
 - `GET /api/v1/games/{game_id}/events`
 - `GET /api/v1/games/{game_id}/events/{event_id}`
 - `POST /api/v1/games/{game_id}/events`
@@ -421,6 +422,7 @@ cd frontend
 npm ci
 npm run lint
 npx tsc --noEmit
+npm run test
 npm run build
 ```
 
@@ -454,7 +456,7 @@ When no external test URL is set, pytest owns and removes that Compose service a
 
 `.github/workflows/quality.yml` runs two parallel jobs on pushes and pull requests:
 
-- Frontend: `npm ci`, ESLint, TypeScript checking, and a production build.
+- Frontend: `npm ci`, ESLint, TypeScript checking, Vitest, and a production build.
 - Backend: `uv sync --frozen --dev`, a CI-only PostgreSQL service, `alembic upgrade head`, and `pytest -q`.
 - CI does not run the seed script and does not require real secrets.
 
@@ -464,9 +466,10 @@ M6.0C converts the final strict xfail (a repeated draft save changing `GamePlaye
 
 ## Not Implemented Yet
 
+The judge event workbench is available at `/judge/games/{game_id}/events`. It consumes authoritative constraints from the server definitions registry and supports all 22 V1 events, effective and ledger views, correction, voiding, and safe `client_event_id` retries. Versioned local drafts contain neither authentication tokens nor a complete Game object.
+
 Still deferred:
 
-- judge event-entry UI
 - event replay state and public/full replay projections
 - automatic adjudication
 - replay tooling

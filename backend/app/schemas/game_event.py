@@ -210,4 +210,19 @@ class GameEventRead(BaseModel):
     client_event_id: str | None
 
 
+class GameEventDefinitionRead(BaseModel):
+    event_type: GameEventType
+    allowed_phases: list[GameEventPhase]
+    default_visibility: GameEventVisibility
+    required_actor: bool
+    required_target: bool
+    allows_actor: bool
+    allows_target: bool
+    allows_secondary_target: bool
+    allowed_sources: list[GameEventSource]
+    schema_version: int
+    payload_schema: dict[str, Any]
+    payload_field_semantics: dict[str, str]
+
+
 GameEventView = Literal["effective", "ledger"]

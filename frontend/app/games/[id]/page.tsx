@@ -133,6 +133,14 @@ export default function GameDetailPage() {
       actions={
         game ? (
           <div className="flex flex-wrap gap-3">
+            {(userIsAdmin || (userIsJudge && profile.user.id === game.judge_user_id)) ? (
+              <Link
+                className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-800 hover:bg-red-100"
+                href={`/judge/games/${game.id}/events`}
+              >
+                {game.play_status === "in_progress" ? t("games.recordEvents") : t("games.viewEventLedger")}
+              </Link>
+            ) : null}
             {canOperatePlay && game.play_status === "scheduled" ? (
               <button disabled={isChangingState} onClick={() => void changePlayState("start")} type="button" className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
                 {t("common.start")}

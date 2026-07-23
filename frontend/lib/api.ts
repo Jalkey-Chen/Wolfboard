@@ -398,6 +398,44 @@ export type GameEventRecord = {
   client_event_id: string | null;
 };
 
+export type GameEventPayloadFieldSemantic =
+  | "participant_id"
+  | "participant_id_list"
+  | "event_id"
+  | "event_id_list";
+
+export type JsonSchemaNode = {
+  type?: string | string[];
+  enum?: Array<string | number | boolean | null>;
+  const?: string | number | boolean | null;
+  default?: unknown;
+  minimum?: number;
+  exclusiveMinimum?: number;
+  maxLength?: number;
+  minItems?: number;
+  uniqueItems?: boolean;
+  additionalProperties?: boolean | JsonSchemaNode;
+  properties?: Record<string, JsonSchemaNode>;
+  required?: string[];
+  items?: JsonSchemaNode;
+  anyOf?: JsonSchemaNode[];
+};
+
+export type GameEventDefinition = {
+  event_type: GameEventType;
+  allowed_phases: GameEventPhase[];
+  default_visibility: GameEventVisibility;
+  required_actor: boolean;
+  required_target: boolean;
+  allows_actor: boolean;
+  allows_target: boolean;
+  allows_secondary_target: boolean;
+  allowed_sources: GameEventSource[];
+  schema_version: number;
+  payload_schema: JsonSchemaNode;
+  payload_field_semantics: Record<string, GameEventPayloadFieldSemantic>;
+};
+
 export type GameConfirmPayload = {
   comment?: string | null;
 };
@@ -508,11 +546,13 @@ export type GameFormatUpdatePayload = {
 
 export class ApiRequestError extends Error {
   detail: unknown;
+  status: number | null;
 
-  constructor(message: string, detail: unknown) {
+  constructor(message: string, detail: unknown, status: number | null = null) {
     super(message);
     this.name = "ApiRequestError";
     this.detail = detail;
+    this.status = status;
   }
 }
 
@@ -554,7 +594,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       detail = "Request failed.";
       message = "Request failed.";
     }
-    throw new ApiRequestError(message, detail);
+    throw new ApiRequestError(message, detail, response.status);
   }
 
   return (await response.json()) as T;
@@ -852,6 +892,11 @@ export function listGameEvents(
   if (options.limit !== undefined) params.set("limit", String(options.limit));
   const query = params.size > 0 ? `?${params.toString()}` : "";
   return request<GameEventRecord[]>(`/games/${gameId}/events${query}`, withAuth(token));
+}
+
+
+export function listGameEventDefinitions(token: string): Promise<GameEventDefinition[]> {
+  return request<GameEventDefinition[]>("/game-events/definitions", withAuth(token));
 }
 
 
