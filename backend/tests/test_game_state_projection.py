@@ -395,6 +395,37 @@ def test_golden_scenario_projects_only_explicit_recorded_facts() -> None:
     assert state.is_rule_engine_result is False
 
 
+def test_golden_scenario_uses_corrected_and_voided_active_timeline() -> None:
+    current_active_events = tuple(
+        event
+        for event in golden_scenario_events()
+        if event.id not in {4, 10}
+    ) + (
+        projection_event(
+            21,
+            "sheriff_vote_cast",
+            logical_sequence_no=10,
+            sequence_no=21,
+            actor=1,
+            target=5,
+            payload={"ballot_no": 1, "vote_weight": 1},
+        ),
+    )
+
+    state = _project(current_active_events)
+
+    sheriff_ballot = _ballot(state, "sheriff", 1)
+    assert sheriff_ballot.vote_event_ids == (21, 11, 12, 13)
+    assert [(item.participant_id, item.vote_weight) for item in sheriff_ballot.raw_tally] == [
+        (4, 2.0),
+        (5, 2.0),
+    ]
+    usage = {item.participant_id: item for item in state.recorded_action_usage}
+    assert usage[2].recorded_witch_antidote_count == 0
+    assert all(item.event_type != "witch_saved" for item in state.recorded_actions)
+    assert state.effective_event_count == 19
+
+
 def test_reasonable_500_event_projection_remains_linear_in_shape() -> None:
     events = tuple(
         projection_event(
