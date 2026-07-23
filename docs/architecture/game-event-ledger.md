@@ -74,6 +74,6 @@ Death causes are `wolf_kill`, `witch_poison`, `exile`, `hunter_shot`, `wolf_king
 
 ## APIs And Deferred Work
 
-The private operator API provides list (`effective` or `ledger`), single read, append, correct, and void endpoints. It eagerly loads participant summaries and creators. Legacy games are not given synthetic historical events.
+The private operator API provides list (`effective` or `ledger`), single read, append, correct, and void endpoints. It eagerly loads participant summaries and creators. Legacy games are not given synthetic historical events. `GET /api/v1/game-events/definitions` exposes the same registry used for write validation to authenticated judges and admins. Its normalized JSON Schema and semantic reference hints let clients render the finite V1 payload controls without becoming a second authority for phase, reference, visibility, or payload rules.
 
-M6.2 will build judge event-entry UI on this contract. M6.3 will derive current state through replay. M6.4 will expose visibility-aware public and full replay projections. Automated phase progression, night resolution, deaths, rule enforcement, and winner inference are intentionally outside M6.1.
+M6.2 provides the private judge/admin workbench described in `game-event-workbench.md`. M6.3 will derive current state through replay. M6.4 will expose visibility-aware public and full replay projections. Automated phase progression, night resolution, deaths, rule enforcement, and winner inference remain intentionally outside the ledger and workbench.
