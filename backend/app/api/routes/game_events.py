@@ -1,8 +1,9 @@
 """Assigned-judge and admin API for structured game-event ledgers."""
 
-from typing import Literal
+from copy import deepcopy
+from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user
@@ -11,9 +12,12 @@ from app.models.user import User
 from app.schemas.game_event import (
     GameEventCorrection,
     GameEventCreate,
+    GameEventDefinitionRead,
     GameEventRead,
     GameEventVoid,
 )
+from app.services.game_event_registry import EVENT_DEFINITIONS, ReferencePolicy
+from app.core.enums import GameEventPhase, GameEventSource
 from app.services.game_event import (
     append_game_event,
     build_game_event_read,
@@ -25,6 +29,62 @@ from app.services.game_event import (
 
 
 router = APIRouter(tags=["game-events"])
+
+
+def _inline_json_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Return a stable client schema without Pydantic's internal definitions."""
+
+    definitions = schema.get("$defs", {})
+
+    def visit(value: Any) -> Any:
+        if isinstance(value, list):
+            return [visit(item) for item in value]
+        if not isinstance(value, dict):
+            return value
+        if "$ref" in value:
+            key = value["$ref"].rsplit("/", 1)[-1]
+            resolved = deepcopy(definitions[key])
+            resolved.update({item_key: item for item_key, item in value.items() if item_key != "$ref"})
+            return visit(resolved)
+        return {
+            item_key: visit(item)
+            for item_key, item in value.items()
+            if item_key not in {"$defs", "title"}
+        }
+
+    return visit(schema)
+
+
+def build_event_definition_reads() -> list[GameEventDefinitionRead]:
+    return [
+        GameEventDefinitionRead(
+            event_type=event_type,
+            allowed_phases=[phase for phase in GameEventPhase if phase in definition.allowed_phases],
+            default_visibility=definition.default_visibility,
+            required_actor=definition.actor == ReferencePolicy.REQUIRED,
+            required_target=definition.target == ReferencePolicy.REQUIRED,
+            allows_actor=definition.actor != ReferencePolicy.FORBIDDEN,
+            allows_target=definition.target != ReferencePolicy.FORBIDDEN,
+            allows_secondary_target=definition.allows_secondary_target,
+            allowed_sources=[source for source in GameEventSource if source in definition.allowed_sources],
+            schema_version=1,
+            payload_schema=_inline_json_schema(definition.payload_schema.model_json_schema()),
+            payload_field_semantics=definition.payload_field_semantics,
+        )
+        for event_type, definition in EVENT_DEFINITIONS.items()
+    ]
+
+
+@router.get("/game-events/definitions", response_model=list[GameEventDefinitionRead])
+def list_game_event_definitions(
+    current_user: User = Depends(get_current_user),
+) -> list[GameEventDefinitionRead]:
+    if not {"admin", "judge"}.intersection(current_user.roles):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The admin or judge role is required to read event definitions.",
+        )
+    return build_event_definition_reads()
 
 
 @router.post("/games/{game_id}/events", response_model=GameEventRead)
