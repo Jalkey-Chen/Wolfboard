@@ -298,6 +298,9 @@ That means:
 ### Structured game-event ledger
 
 - `GameEvent` records in-game actions and resolved facts without duplicating Game lifecycle, result review, scoring, or state history. Normal appends are facts; only correction and void operations also write AuditLog.
+- `GET /api/v1/games/{game_id}/derived-state` deterministically projects the current effective timeline into explicit phase, exit records, sheriff state, ballots, recorded action counts, and consistency issues. It is read-only recorded state, not an automated ruling or rules-engine result.
+- Optional `through_logical_sequence` reads a logical prefix of the current effective timeline. It cannot reconstruct the historical as-of view before correction or voiding.
+- The pure projector neither accesses the database nor reads the clock, writes events, or changes Game. `projection_version = 1` fixes the current semantics; see `docs/architecture/game-state-projection.md`.
 - `sequence_no` is immutable ledger order and `logical_sequence_no` is effective timeline position. Correction appends a replacement at the same logical position and retains the old version as `superseded`; void retains the original body as `voided`.
 - A Game row lock and `next_event_sequence` serialize allocation. `client_event_id` provides per-game retry idempotency, and a partial unique index permits at most one active version per logical position.
 - Event actors and targets use stable `GameParticipant` rows and require frozen format context. Once any event references a participant, result drafts cannot delete it or change its user/seat binding.
@@ -391,6 +394,7 @@ This is only a compact list of key routes:
 ### Game events
 
 - `GET /api/v1/game-events/definitions`
+- `GET /api/v1/games/{game_id}/derived-state`
 - `GET /api/v1/games/{game_id}/events`
 - `GET /api/v1/games/{game_id}/events/{event_id}`
 - `POST /api/v1/games/{game_id}/events`
@@ -468,9 +472,9 @@ M6.0C converts the final strict xfail (a repeated draft save changing `GamePlaye
 
 The judge event workbench is available at `/judge/games/{game_id}/events`. It consumes authoritative constraints from the server definitions registry and supports all 22 V1 events, effective and ledger views, correction, voiding, and safe `client_event_id` retries. Versioned local drafts contain neither authentication tokens nor a complete Game object.
 
-Still deferred:
+The deterministic read-only backend projection is now available, but it is not yet displayed in the event workbench. Still deferred:
 
-- event replay state and public/full replay projections
+- the workbench state panel and public/full replay projections
 - automatic adjudication
 - replay tooling
 - complex rules engine
